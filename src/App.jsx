@@ -218,7 +218,7 @@ export default function App() {
   if (screen === "install") return <InstallPage onInstalled={handleInstalled} />;
 
   if (screen === "welcome") return (
-    <div style={{ minHeight: "100vh", background: "#f7f6f5", fontFamily: "'DM Sans', sans-serif", color: DARK, maxWidth: 480, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", background: "#f7f6f5", fontFamily: "'DM Sans', sans-serif", color: DARK, maxWidth: 480, margin: "0 auto", boxSizing: "border-box", overflowX: "hidden", width: "100%" }}>
       <div style={{ background: `linear-gradient(160deg, #f5e6e4, ${PINK})`, padding: "2rem 1.5rem 1.5rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
         <p style={{ fontFamily: "'Cormorant', Georgia, serif", fontSize: 26, color: "#fff", margin: 0, fontWeight: 400 }}>bliss for you</p>
         <WaveBackground color="#fff" opacity={0.08} />
@@ -263,7 +263,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f7f6f5", fontFamily: "'DM Sans', sans-serif", color: DARK, maxWidth: 480, margin: "0 auto", paddingBottom: "2rem" }}>
+    <div style={{ minHeight: "100vh", background: "#f7f6f5", fontFamily: "'DM Sans', sans-serif", color: DARK, maxWidth: 480, margin: "0 auto", paddingBottom: "2rem", boxSizing: "border-box", overflowX: "hidden", width: "100%" }}>
       <style>{`
         @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
         @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
@@ -355,7 +355,7 @@ export default function App() {
         <div className="section" style={{ background: "#fff", borderRadius: 24, padding: "1.5rem", marginBottom: 14, boxShadow: `0 0 0 1px ${PINK}11, 0 4px 20px ${PINK}0a`, position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: -30, right: -30, width: 100, height: 100, borderRadius: "50%", background: `${PINK}08` }} />
           <span style={{ fontSize: 11, color: PINK, letterSpacing: "0.08em", textTransform: "uppercase", display: "block", marginBottom: 8, fontWeight: 500 }}>today's tip {goalObj ? `· ${goalObj.icon}` : ""}</span>
-          <p style={{ fontSize: 15, color: "#555", margin: 0, lineHeight: 1.75, fontStyle: "italic" }}>"{goalTips[tipIndex]}"</p>
+          <p style={{ fontSize: 15, color: "#555", margin: 0, lineHeight: 1.75 }}>{goalTips[tipIndex]}</p>
         </div>
 
         {/* BEFORE & AFTER */}
@@ -444,8 +444,8 @@ export default function App() {
           </div>
           <div style={{ padding: "1rem 1.5rem 1.5rem" }}>
             <p style={{ fontSize: 14, color: "#777", margin: "0 0 16px", lineHeight: 1.7 }}>25% off every month. free UK shipping. cancel whenever — no commitment.</p>
-            <a href="https://blissforyou.uk" style={{ ...btn, display: "block", textAlign: "center", textDecoration: "none", lineHeight: "1.5", borderRadius: 999 }}>subscribe on blissforyou.uk</a>
-            <a href="https://blissforyou.uk" style={{ display: "block", textAlign: "center", textDecoration: "none", color: PINK, fontSize: 13, marginTop: 12, fontWeight: 500 }}>or buy once at £18.99 →</a>
+            <a href="https://blissforyou.uk/products/hair-skin-nails-gummies-30-day-glow-complex" style={{ ...btn, display: "block", textAlign: "center", textDecoration: "none", lineHeight: "1.5", borderRadius: 999 }}>subscribe on blissforyou.uk</a>
+            <a href="https://blissforyou.uk/products/hair-skin-nails-gummies-30-day-glow-complex" style={{ display: "block", textAlign: "center", textDecoration: "none", color: PINK, fontSize: 13, marginTop: 12, fontWeight: 500 }}>or buy once at £18.99 →</a>
           </div>
         </div>
 
