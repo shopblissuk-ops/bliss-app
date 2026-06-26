@@ -179,14 +179,17 @@ function Home({ user, setUser }) {
     if (g === glassesGoal && water < glassesGoal) addPoints(5); // hit goal once/day
   };
 
+  const removeGlass = () => {
+    const g = Math.max(0, water - 1);
+    setWater(g);
+    ls.set("bliss_water", { date: todayStr(), glasses: g });
+  };
+
   // ── Glow Score (0-100): streak progress 50, water 30, check-in 20 ──
   const streakPart = Math.min(1, streak / 30) * 50;
   const waterPart = Math.min(1, water / glassesGoal) * 30;
   const checkinPart = checkedToday ? 20 : 0;
   const glow = Math.round(streakPart + waterPart + checkinPart);
-
-  const goalKey = (user.goal || "All three").toLowerCase();
-  const tip = TIPS[goalKey] || TIPS["all three"];
 
   return (
     <Shell>
@@ -216,23 +219,11 @@ function Home({ user, setUser }) {
       {/* POINTS */}
       <PointsCard points={points} />
 
+      {/* PROGRESS PHOTOS — moved higher, add anytime */}
+      <PhotoTimeline streak={streak} />
+
       {/* WATER */}
-      <WaterCard water={water} goal={glassesGoal} litres={litresGoal} onAdd={addGlass} />
-
-      {/* STATS */}
-      <StatsGrid streak={streak} water={water} goal={glassesGoal} />
-
-      {/* TIP */}
-      <div style={card} className="fadeUp">
-        <p style={cardLabel}>Today's tip</p>
-        <p style={{ color: DARK, lineHeight: 1.6, margin: "6px 0 0" }}>{tip}</p>
-      </div>
-
-      {/* INGREDIENT DEEP DIVE */}
-      <Ingredients />
-
-      {/* WEEKLY PHOTO PROMPT + TIMELINE */}
-      <PhotoTimeline streak={streak} onPhoto={() => {}} />
+      <WaterCard water={water} goal={glassesGoal} litres={litresGoal} onAdd={addGlass} onRemove={removeGlass} />
 
       {/* GROUP CHALLENGES */}
       <GroupChallenge user={user} patchUser={patchUser} streak={streak} />
@@ -242,6 +233,9 @@ function Home({ user, setUser }) {
 
       {/* RESULTS WALL */}
       <ResultsWall user={user} streak={streak} patchUser={patchUser} onSubmitPoints={() => addPoints(25)} />
+
+      {/* INGREDIENT DEEP DIVE — moved to bottom */}
+      <Ingredients />
 
       {/* SHOP */}
       <ShopCard />
@@ -317,7 +311,7 @@ function PointsCard({ points }) {
 }
 
 // ── WATER ─────────────────────────────────────────────────
-function WaterCard({ water, goal, litres, onAdd }) {
+function WaterCard({ water, goal, litres, onAdd, onRemove }) {
   const fill = Math.min(100, (water / goal) * 100);
   return (
     <div style={{ ...card, background: "#f0f6fb", borderColor: "#cfe3f0", position: "relative", overflow: "hidden" }} className="fadeUp">
@@ -325,7 +319,10 @@ function WaterCard({ water, goal, litres, onAdd }) {
         <p style={{ ...cardLabel, color: "#5a7d99" }}>Hydration · goal {litres}L</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
           <span style={{ ...serif, fontSize: 40, color: "#2b5876" }}>{water}<span style={{ fontSize: 20, color: "#7b9bb0" }}>/{goal}</span></span>
-          <button style={{ ...primaryBtn, width: "auto", padding: "10px 22px", background: "#3b7ea1" }} onClick={onAdd}>+ Glass</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button aria-label="Remove a glass" style={{ ...primaryBtn, width: "auto", padding: "10px 16px", background: "#dceaf3", color: "#3b7ea1", opacity: water === 0 ? 0.4 : 1 }} disabled={water === 0} onClick={onRemove}>−</button>
+            <button style={{ ...primaryBtn, width: "auto", padding: "10px 22px", background: "#3b7ea1" }} onClick={onAdd}>+ Glass</button>
+          </div>
         </div>
       </div>
       <svg viewBox="0 0 500 80" preserveAspectRatio="none"
@@ -335,26 +332,6 @@ function WaterCard({ water, goal, litres, onAdd }) {
             values="M0,40 C125,10 375,70 500,40 L500,80 L0,80 Z;M0,40 C125,70 375,10 500,40 L500,80 L0,80 Z;M0,40 C125,10 375,70 500,40 L500,80 L0,80 Z" />
         </path>
       </svg>
-    </div>
-  );
-}
-
-// ── STATS ─────────────────────────────────────────────────
-function StatsGrid({ streak, water, goal }) {
-  const cells = [
-    ["Days done", streak],
-    ["Days left", Math.max(0, 30 - streak)],
-    ["Complete", `${Math.round((streak / 30) * 100)}%`],
-    ["Gummies", streak * 2],
-  ];
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="fadeUp">
-      {cells.map(([l, v]) => (
-        <div key={l} style={{ ...card, margin: 0, textAlign: "center", padding: 18 }}>
-          <div style={{ ...serif, fontSize: 30, color: DARK }}>{v}</div>
-          <div style={{ color: "#999", fontSize: 12 }}>{l}</div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -385,47 +362,51 @@ function Ingredients() {
   );
 }
 
-// ── PHOTO TIMELINE ────────────────────────────────────────
+// ── HIGHLIGHTS / PROGRESS PHOTOS ──────────────────────────
 function PhotoTimeline({ streak }) {
-  const [photos, setPhotos] = useState(() => ls.get("bliss_photos", [])); // [{week, data}]
+  const [photos, setPhotos] = useState(() => ls.get("bliss_photos", [])); // [{id, day, date, data}]
   const fileRef = useRef();
-  const currentWeek = Math.floor(streak / 7) + 1;
-  const promptDue = streak > 0 && streak % 7 === 0 && !photos.some((p) => p.week === currentWeek);
 
   const onFile = (e) => {
     const f = e.target.files?.[0]; if (!f) return;
     const r = new FileReader();
     r.onload = () => {
-      const next = [...photos.filter((p) => p.week !== currentWeek), { week: currentWeek, data: r.result }];
+      const entry = { id: crypto.randomUUID(), day: streak, date: todayStr(), data: r.result };
+      const next = [...photos, entry];
       setPhotos(next); ls.set("bliss_photos", next);
     };
     r.readAsDataURL(f);
+    e.target.value = ""; // allow re-selecting same file
+  };
+
+  const remove = (id) => {
+    const next = photos.filter((p) => p.id !== id);
+    setPhotos(next); ls.set("bliss_photos", next);
   };
 
   return (
     <div style={card} className="fadeUp">
-      <p style={cardLabel}>Progress photos</p>
-      {promptDue && (
-        <div style={{ background: "#fdf2f0", border: `1px solid ${ACCENT}55`, borderRadius: 16, padding: 14, margin: "8px 0 14px" }}>
-          <p style={{ ...serif, fontSize: 18, color: DARK, margin: 0 }}>Week {currentWeek} check-in 📸</p>
-          <p style={{ color: "#777", fontSize: 13, margin: "4px 0 10px" }}>Capture today so you can see your glow build over time.</p>
-          <button style={{ ...primaryBtn, padding: "10px 18px", width: "auto" }} onClick={() => fileRef.current?.click()}>Add this week's photo</button>
-        </div>
-      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <p style={cardLabel}>Highlights</p>
+        <button style={{ ...primaryBtn, width: "auto", padding: "8px 16px", fontSize: 14 }} onClick={() => fileRef.current?.click()}>+ Add</button>
+      </div>
+      <p style={{ color: "#999", fontSize: 13, margin: "8px 0 14px" }}>Capture your glow anytime — build a swipeable timeline of your journey.</p>
       <input ref={fileRef} type="file" accept="image/*" capture="user" hidden onChange={onFile} />
       {photos.length === 0 ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>Your weekly photos will appear here as a swipeable timeline.</p>
+        <button onClick={() => fileRef.current?.click()} style={{ width: "100%", height: 150, borderRadius: 16, border: `1.5px dashed ${ACCENT}66`, background: "#fff", color: ACCENT, fontSize: 14 }}>
+          Add your first highlight 📸
+        </button>
       ) : (
         <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6, scrollSnapType: "x mandatory" }}>
-          {photos.sort((a, b) => a.week - b.week).map((p) => (
-            <div key={p.week} style={{ flex: "0 0 auto", scrollSnapAlign: "start", textAlign: "center" }}>
-              <img src={p.data} alt={`Week ${p.week}`} style={{ width: 130, height: 170, objectFit: "cover", borderRadius: 16, border: `1px solid ${ACCENT}33` }} />
-              <div style={{ color: "#999", fontSize: 12, marginTop: 6 }}>Week {p.week}</div>
+          {photos.map((p) => (
+            <div key={p.id} style={{ flex: "0 0 auto", scrollSnapAlign: "start", textAlign: "center", position: "relative" }}>
+              <img src={p.data} alt={`Day ${p.day}`} style={{ width: 130, height: 170, objectFit: "cover", borderRadius: 16, border: `1px solid ${ACCENT}33` }} />
+              <button onClick={() => remove(p.id)} aria-label="Delete photo"
+                style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: 99, border: "none", background: "rgba(0,0,0,.5)", color: "#fff", fontSize: 14, lineHeight: 1, cursor: "pointer" }}>×</button>
+              <div style={{ color: "#999", fontSize: 12, marginTop: 6 }}>Day {p.day}</div>
             </div>
           ))}
-          {!promptDue && (
-            <button onClick={() => fileRef.current?.click()} style={{ flex: "0 0 auto", width: 130, height: 170, borderRadius: 16, border: `1.5px dashed ${ACCENT}66`, background: "#fff", color: ACCENT, fontSize: 30 }}>+</button>
-          )}
+          <button onClick={() => fileRef.current?.click()} style={{ flex: "0 0 auto", width: 130, height: 170, borderRadius: 16, border: `1.5px dashed ${ACCENT}66`, background: "#fff", color: ACCENT, fontSize: 30 }}>+</button>
         </div>
       )}
     </div>
