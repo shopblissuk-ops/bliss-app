@@ -283,29 +283,15 @@ function GlowScore({ glow }) {
 
 // ── POINTS ────────────────────────────────────────────────
 function PointsCard({ points }) {
-  const next = TIERS.find((t) => points < t.pts);
-  const reached = TIERS.filter((t) => points >= t.pts);
-  const prevPts = next ? (TIERS[TIERS.indexOf(next) - 1]?.pts || 0) : 500;
-  const pct = next ? Math.min(100, ((points - prevPts) / (next.pts - prevPts)) * 100) : 100;
   return (
     <div style={card} className="fadeUp">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <p style={cardLabel}>Glow points</p>
-        <span style={{ ...serif, fontSize: 28, color: ACCENT }}>{points}</span>
+      <p style={cardLabel}>Glow points</p>
+      <div style={{ textAlign: "center", padding: "6px 0 2px" }}>
+        <span style={{ ...serif, fontSize: 56, color: ACCENT, textShadow: `0 0 20px ${ACCENT}44`, lineHeight: 1 }}>{points}</span>
       </div>
-      <div style={{ height: 10, background: "#eee", borderRadius: 99, overflow: "hidden", margin: "10px 0 8px" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: ACCENT, borderRadius: 99, transition: "width .5s" }} />
-      </div>
-      <p style={{ color: "#999", fontSize: 13, margin: 0 }}>
-        {next ? `${next.pts - points} pts to ${next.label}` : "Top tier unlocked 🎉"}
+      <p style={{ color: "#999", fontSize: 13, textAlign: "center", margin: "6px 0 0" }}>
+        Earn points for checking in, hydrating, hitting streaks & bringing friends.
       </p>
-      {reached.length > 0 && (
-        <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {reached.map((t) => (
-            <div key={t.pts} style={codeChip}>{t.label} · <b>{t.code}</b></div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -445,8 +431,17 @@ function GroupChallenge({ user, patchUser, streak }) {
   const join = async () => {
     const gc = input.trim();
     if (gc.length !== 6) return;
-    const { data: existing } = await supabase.from("users").select("id").eq("group_code", gc);
+    const { data: existing } = await supabase.from("users").select("id,points").eq("group_code", gc);
+    if ((existing?.length || 0) === 0) { alert("No group found with that code."); return; }
     if ((existing?.length || 0) >= 5) { alert("This group is full (max 5)."); return; }
+    // reward each existing member +50 for the friend joining
+    try {
+      await Promise.all(
+        (existing || []).map((m) =>
+          supabase.from("users").update({ points: (m.points || 0) + 50 }).eq("id", m.id)
+        )
+      );
+    } catch (e) { console.error(e); }
     await patchUser({ group_code: gc });
     setCode(gc);
   };
