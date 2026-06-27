@@ -12,21 +12,6 @@ const ACCENT = "#C9908A";
 const DARK = "#1a1a1a";
 const BG = "#f7f6f5";
 
-const INGREDIENTS = [
-  { name: "Biotin", dose: "5000μg", what: "A B-vitamin that supports keratin production — the structural protein your hair and nails are built from.", why: "5000μg is a high, results-focused dose. Lower-cost gummies often use 50–100μg, which is too little to move the needle on hair strength." },
-  { name: "Zinc", dose: "10mg", what: "Helps your body build and repair tissue, including the cells in hair follicles and skin.", why: "10mg covers most of your daily need. Zinc deficiency is one of the most common causes of hair shedding." },
-  { name: "Vitamin C", dose: "80mg", what: "Essential for collagen synthesis, which keeps skin firm and supports the scalp.", why: "80mg meets 100% of your daily reference intake, and it helps your body absorb other nutrients too." },
-  { name: "Vitamin A", dose: "800μg", what: "Supports skin cell turnover and helps glands produce sebum that keeps skin and scalp moisturised.", why: "800μg is the full daily reference — enough to support skin without tipping into excess." },
-  { name: "Vitamin D", dose: "5μg", what: "Plays a role in creating new hair follicles and is linked to healthy skin barrier function.", why: "Most people in the UK are low on vitamin D, especially over winter, so topping up matters." },
-  { name: "Vitamin E", dose: "12mg", what: "An antioxidant that protects skin cells from oxidative stress and supports a healthy scalp.", why: "12mg is the full daily reference intake, working alongside vitamin C for skin protection." },
-];
-
-const TIERS = [
-  { pts: 50, label: "5% off", code: "GLOW5" },
-  { pts: 150, label: "10% off", code: "GLOW10" },
-  { pts: 300, label: "15% off", code: "GLOW15" },
-  { pts: 500, label: "20% off", code: "GLOW20" },
-];
 
 const GLASS_ML = 250; // one glass = 250ml
 
@@ -135,7 +120,6 @@ function Signup({ onDone }) {
 function Home({ user, setUser }) {
   const [streak, setStreak] = useState(user.day_streak || 0);
   const [last, setLast] = useState(user.last_checkin);
-  const [points, setPoints] = useState(user.points || 0);
 
   // device-only today state
   const [water, setWater] = useState(() => {
@@ -157,18 +141,11 @@ function Home({ user, setUser }) {
     try { await supabase.from("users").update(patch).eq("id", user.id); } catch (e) { console.error(e); }
   };
 
-  const addPoints = (n) => { const np = points + n; setPoints(np); patchUser({ points: np }); return np; };
-
   const doCheckin = () => {
     if (checkedToday) return;
     const t = todayStr();
     const newStreak = streak + 1;
     setStreak(newStreak); setLast(t);
-    let gained = 10;
-    if (newStreak === 7) gained += 50;
-    if (newStreak === 14) gained += 100;
-    if (newStreak === 30) gained += 250;
-    addPoints(gained);
     patchUser({ day_streak: newStreak, last_checkin: t });
   };
 
@@ -176,7 +153,6 @@ function Home({ user, setUser }) {
     const g = Math.min(glassesGoal, water + 1);
     setWater(g);
     ls.set("bliss_water", { date: todayStr(), glasses: g });
-    if (g === glassesGoal && water < glassesGoal) addPoints(5); // hit goal once/day
   };
 
   const removeGlass = () => {
@@ -216,10 +192,7 @@ function Home({ user, setUser }) {
         </button>
       </div>
 
-      {/* POINTS */}
-      <PointsCard points={points} />
-
-      {/* PROGRESS PHOTOS — moved higher, add anytime */}
+      {/* PROGRESS PHOTOS — add anytime */}
       <PhotoTimeline streak={streak} />
 
       {/* WATER */}
@@ -232,10 +205,7 @@ function Home({ user, setUser }) {
       <Leaderboard meId={user.id} />
 
       {/* RESULTS WALL */}
-      <ResultsWall user={user} streak={streak} patchUser={patchUser} onSubmitPoints={() => addPoints(25)} />
-
-      {/* INGREDIENT DEEP DIVE — moved to bottom */}
-      <Ingredients />
+      <ResultsWall user={user} streak={streak} patchUser={patchUser} />
 
       {/* SHOP */}
       <ShopCard />
@@ -281,21 +251,6 @@ function GlowScore({ glow }) {
   );
 }
 
-// ── POINTS ────────────────────────────────────────────────
-function PointsCard({ points }) {
-  return (
-    <div style={card} className="fadeUp">
-      <p style={cardLabel}>Glow points</p>
-      <div style={{ textAlign: "center", padding: "6px 0 2px" }}>
-        <span style={{ ...serif, fontSize: 56, color: ACCENT, textShadow: `0 0 20px ${ACCENT}44`, lineHeight: 1 }}>{points}</span>
-      </div>
-      <p style={{ color: "#999", fontSize: 13, textAlign: "center", margin: "6px 0 0" }}>
-        Earn points for checking in, hydrating, hitting streaks & bringing friends.
-      </p>
-    </div>
-  );
-}
-
 // ── WATER ─────────────────────────────────────────────────
 function WaterCard({ water, goal, litres, onAdd, onRemove }) {
   const fill = Math.min(100, (water / goal) * 100);
@@ -318,32 +273,6 @@ function WaterCard({ water, goal, litres, onAdd, onRemove }) {
             values="M0,40 C125,10 375,70 500,40 L500,80 L0,80 Z;M0,40 C125,70 375,10 500,40 L500,80 L0,80 Z;M0,40 C125,10 375,70 500,40 L500,80 L0,80 Z" />
         </path>
       </svg>
-    </div>
-  );
-}
-
-// ── INGREDIENTS ───────────────────────────────────────────
-function Ingredients() {
-  const [open, setOpen] = useState(null);
-  return (
-    <div style={card} className="fadeUp">
-      <p style={cardLabel}>What's inside</p>
-      <p style={{ color: "#999", fontSize: 13, margin: "4px 0 14px" }}>Tap any ingredient to see why the dose matters.</p>
-      {INGREDIENTS.map((ing, i) => (
-        <div key={ing.name} onClick={() => setOpen(open === i ? null : i)}
-          style={{ border: "1px solid #efe7e6", borderRadius: 16, padding: "14px 16px", marginBottom: 10, cursor: "pointer", background: open === i ? "#fdf7f6" : "#fff", transition: "background .2s" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: DARK, fontWeight: 600 }}>{ing.name}</span>
-            <span style={{ color: ACCENT, fontSize: 14 }}>{ing.dose} {open === i ? "▴" : "▾"}</span>
-          </div>
-          {open === i && (
-            <div style={{ marginTop: 10 }}>
-              <p style={{ color: "#555", fontSize: 14, lineHeight: 1.55, margin: "0 0 8px" }}>{ing.what}</p>
-              <p style={{ color: "#888", fontSize: 13, lineHeight: 1.55, margin: 0 }}><b style={{ color: ACCENT }}>Why the dose:</b> {ing.why}</p>
-            </div>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
@@ -516,7 +445,7 @@ function Leaderboard({ meId }) {
 }
 
 // ── RESULTS WALL ──────────────────────────────────────────
-function ResultsWall({ user, streak, patchUser, onSubmitPoints }) {
+function ResultsWall({ user, streak, patchUser }) {
   const [feed, setFeed] = useState([]);
   const [text, setText] = useState("");
   const canSubmit = streak >= 30 && !user.results_submitted;
@@ -534,7 +463,6 @@ function ResultsWall({ user, streak, patchUser, onSubmitPoints }) {
     try {
       await supabase.from("results_wall").insert({ results_text: text.trim(), goal: user.goal });
       await patchUser({ results_submitted: true, results_text: text.trim() });
-      onSubmitPoints();
       setText(""); load();
     } catch (e) { console.error(e); }
   };
@@ -548,7 +476,7 @@ function ResultsWall({ user, streak, patchUser, onSubmitPoints }) {
           <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={140}
             placeholder="Share your result… e.g. my nails are so much stronger"
             style={{ width: "100%", border: "1px solid #e7dcdb", borderRadius: 12, padding: 12, fontFamily: "inherit", resize: "none", boxSizing: "border-box" }} rows={2} />
-          <button style={{ ...primaryBtn, marginTop: 10 }} onClick={submit}>Share anonymously (+25 pts)</button>
+          <button style={{ ...primaryBtn, marginTop: 10 }} onClick={submit}>Share anonymously</button>
         </div>
       )}
       {feed.length === 0 ? (
