@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dog sitting — book a stay</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fredoka+One&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --rose: #C9908A;
+    --rose-light: #f5eeee;
+    --rose-mid: #e8d5d3;
+    --dark: #2C2C2C;
+    --muted: #888;
+    --border: #ede8e8;
+    --bg: #faf8f8;
+    --white: #ffffff;
+    --radius: 14px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--dark);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 16px 60px;
+  }
+
+  nav {
+    width: 100%;
+    max-width: 480px;
+    padding: 24px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+  }
+
+  .logo {
+    font-family: 'Fredoka One', cursive;
+    font-size: 22px;
+    color: var(--dark);
+    font-weight: 400;
+  }
+
+  .logo span { color: var(--rose); }
+
+  .step-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background .3s;
+  }
+
+  .dot.active { background: var(--rose); }
+  .dot.done { background: var(--rose-mid); }
+
+  .page { display: none; width: 100%; max-width: 480px; }
+  .page.active { display: block; }
+
+  h1 {
+    font-family: 'Fredoka One', cursive;
+    font-size: 32px;
+    font-weight: 400;
+    color: var(--dark);
+    line-height: 1.15;
+    margin-bottom: 6px;
+  }
+
+  .sub {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 28px;
+    line-height: 1.5;
+  }
+
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 14px;
+  }
+
+  .card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .dog-counter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .counter-val {
+    font-family: 'Fredoka One', cursive;
+    font-size: 48px;
+    color: var(--dark);
+    line-height: 1;
+    min-width: 48px;
+    text-align: center;
+  }
+
+  .counter-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--white);
+    color: var(--dark);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color .2s, background .2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .counter-btn:hover { border-color: var(--rose); background: var(--rose-light); }
+  .counter-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+  .counter-sub {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  .slider-wrap {
+    padding: 4px 0 8px;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+    margin: 12px 0 6px;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--rose);
+    border: 3px solid var(--white);
+    box-shadow: 0 1px 6px rgba(201,144,138,.35);
+    cursor: pointer;
+    transition: transform .15s;
+  }
+
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 99px;
+  }
+
+  .slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .days-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+
+  .days-num {
+    font-family: 'Fredoka One', cursive;
+    font-size: 36px;
+    color: var(--dark);
+    line-height: 1;
+  }
+
+  .days-unit {
+    font-size: 14px;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  .price-pill {
+    background: var(--rose-light);
+    border: 1px solid var(--rose-mid);
+    border-radius: 99px;
+    padding: 5px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--rose);
+  }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: var(--rose-light);
+    border: 1px solid var(--rose-mid);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+  }
+
+  .total-label { font-size: 14px; color: var(--muted); }
+
+  .total-amount {
+    font-family: 'Fredoka One', cursive;
+    font-size: 30px;
+    color: var(--dark);
+  }
+
+  .btn-primary {
+    width: 100%;
+    background: var(--rose);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius);
+    padding: 16px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: background .2s, transform .1s;
+    letter-spacing: .01em;
+  }
+
+  .btn-primary:hover { background: #b07a74; }
+  .btn-primary:active { transform: scale(.99); }
+
+  .btn-back {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    padding: 12px;
+    margin-top: 4px;
+  }
+
+  .btn-back:hover { color: var(--dark); }
+
+  input[type=text], input[type=email], input[type=tel], textarea, select {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--dark);
+    background: var(--white);
+    outline: none;
+    transition: border-color .2s;
+    resize: none;
+  }
+
+  input:focus, textarea:focus, select:focus { border-color: var(--rose); }
+
+  .field { margin-bottom: 14px; }
+  .field label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; font-weight: 500; }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .checkbox-group { display: flex; flex-direction: column; gap: 10px; }
+
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    font-size: 14px;
+    color: var(--dark);
+    user-select: none;
+  }
+
+  .check-item:hover { border-color: var(--rose-mid); background: var(--rose-light); }
+  .check-item.checked { border-color: var(--rose); background: var(--rose-light); }
+
+  .check-box {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background .2s, border-color .2s;
+  }
+
+  .check-item.checked .check-box {
+    background: var(--rose);
+    border-color: var(--rose);
+    color: white;
+  }
+
+  .check-item.checked .check-box::after { content: '✓'; font-size: 11px; font-weight: 700; color: white; }
+
+  .success-wrap {
+    text-align: center;
+    padding: 40px 0;
+  }
+
+  .success-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--rose-light);
+    border: 1px solid var(--rose-mid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 28px;
+  }
+
+  .success-wrap h1 { margin-bottom: 10px; }
+  .success-wrap .sub { max-width: 280px; margin: 0 auto 28px; }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row span:first-child { color: var(--muted); }
+  .summary-row span:last-child { font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">paw<span>.</span></div>
+  <div class="step-dots">
+    <div class="dot active" id="d1"></div>
+    <div class="dot" id="d2"></div>
+    <div class="dot" id="d3"></div>
+  </div>
+</nav>
+
+<!-- PAGE 1 — dogs + days -->
+<div class="page active" id="p1">
+  <h1>book a stay</h1>
+  <p class="sub">We look after your dog like our own.</p>
+
+  <div class="card">
+    <p class="card-label">number of dogs</p>
+    <div class="dog-counter">
+      <button class="counter-btn" id="dec" onclick="changeDogs(-1)" disabled>−</button>
+      <div>
+        <div class="counter-val" id="dogCount">1</div>
+        <div class="counter-sub">dog</div>
+      </div>
+      <button class="counter-btn" id="inc" onclick="changeDogs(1)">+</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">length of stay</p>
+    <div class="days-display">
+      <div>
+        <span class="days-num" id="daysNum">3</span>
+        <span class="days-unit">days</span>
+      </div>
+      <div class="price-pill" id="pricePill">£30 / day</div>
+    </div>
+    <div class="slider-wrap">
+      <input type="range" id="daysSlider" min="1" max="30" value="3" step="1" oninput="updateDays(this.value)">
+      <div class="slider-labels"><span>1 day</span><span>30 days</span></div>
+    </div>
+  </div>
+
+  <div class="total-row">
+    <span class="total-label">total</span>
+    <span class="total-amount" id="totalAmt">£90</span>
+  </div>
+
+  <button class="btn-primary" onclick="goTo(2)">continue</button>
+</div>
+
+<!-- PAGE 2 — details -->
+<div class="page" id="p2">
+  <h1>your details</h1>
+  <p class="sub">Just a few things so we can get everything ready.</p>
+
+  <div class="card">
+    <p class="card-label">about you</p>
+    <div class="field-row">
+      <div class="field">
+        <label>first name</label>
+        <input type="text" placeholder="Ella">
+      </div>
+      <div class="field">
+        <label>last name</label>
+        <input type="text" placeholder="Jones">
+      </div>
+    </div>
+    <div class="field">
+      <label>email</label>
+      <input type="email" placeholder="ella@email.com">
+    </div>
+    <div class="field">
+      <label>phone</label>
+      <input type="tel" placeholder="07…">
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">about your dog</p>
+    <div class="field-row">
+      <div class="field">
+        <label>dog's name</label>
+        <input type="text" placeholder="Biscuit">
+      </div>
+      <div class="field">
+        <label>breed</label>
+        <input type="text" placeholder="Cockapoo">
+      </div>
+    </div>
+    <div class="field">
+      <label>drop-off date</label>
+      <input type="text" placeholder="e.g. 10 July 2026">
+    </div>
+    <div class="field">
+      <label>anything we should know?</label>
+      <textarea rows="3" placeholder="Allergies, favourite toys, separation anxiety…"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">extras</p>
+    <div class="checkbox-group">
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"></div>
+        Daily photo updates
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"></div>
+        Two walks per day
+      </div>
+      <div class="check-item" onclick="toggleCheck(this)">
+        <div class="check-box"></div>
+        Grooming on collection day
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="goTo(3)">confirm booking</button>
+  <button class="btn-back" onclick="goTo(1)">← back</button>
+</div>
+
+<!-- PAGE 3 — confirmation -->
+<div class="page" id="p3">
+  <div class="success-wrap">
+    <div class="success-icon">🐾</div>
+    <h1>you're booked</h1>
+    <p class="sub">We'll be in touch within a couple of hours to confirm everything.</p>
+  </div>
+
+  <div class="card">
+    <p class="card-label">booking summary</p>
+    <div class="summary-row"><span>dogs</span><span id="sumDogs">1 dog</span></div>
+    <div class="summary-row"><span>stay</span><span id="sumDays">3 days</span></div>
+    <div class="summary-row"><span>total</span><span id="sumTotal">£90</span></div>
+  </div>
+</div>
+
+<script>
+  let dogs = 1;
+  let days = 3;
+  const RATE = 30;
+
+  function changeDogs(n) {
+    dogs = Math.max(1, Math.min(10, dogs + n));
+    document.getElementById('dogCount').textContent = dogs;
+    document.querySelector('#p1 .counter-sub').textContent = dogs === 1 ? 'dog' : 'dogs';
+    document.getElementById('dec').disabled = dogs <= 1;
+    document.getElementById('inc').disabled = dogs >= 10;
+    updateTotal();
+  }
+
+  function updateDays(v) {
+    days = parseInt(v);
+    document.getElementById('daysNum').textContent = days;
+    updateTotal();
+  }
+
+  function updateTotal() {
+    const total = dogs * days * RATE;
+    document.getElementById('totalAmt').textContent = '£' + total.toLocaleString();
+  }
+
+  function goTo(n) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('p' + n).classList.add('active');
+    ['d1','d2','d3'].forEach((id, i) => {
+      const dot = document.getElementById(id);
+      dot.classList.remove('active','done');
+      if (i + 1 === n) dot.classList.add('active');
+      else if (i + 1 < n) dot.classList.add('done');
+    });
+    if (n === 3) {
+      const total = dogs * days * RATE;
+      document.getElementById('sumDogs').textContent = dogs + (dogs === 1 ? ' dog' : ' dogs');
+      document.getElementById('sumDays').textContent = days + (days === 1 ? ' day' : ' days');
+      document.getElementById('sumTotal').textContent = '£' + total.toLocaleString();
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function toggleCheck(el) {
+    el.classList.toggle('checked');
+  }
+</script>
+</body>
+</html>
