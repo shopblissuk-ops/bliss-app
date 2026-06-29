@@ -26,15 +26,16 @@ const ls = {
 };
 
 export default function App() {
-  // ── identity / persistence ──
   const [user, setUser] = useState(() => ls.get("bliss_user", null));
   const [installed, setInstalled] = useState(
     () => window.matchMedia("(display-mode: standalone)").matches || ls.get("bliss_installed", false)
   );
+  const [page, setPage] = useState("home");
 
   if (!installed) return <InstallGate onDone={() => { ls.set("bliss_installed", true); setInstalled(true); }} />;
   if (!user) return <Signup onDone={(u) => { ls.set("bliss_user", u); setUser(u); }} />;
-  return <Home user={user} setUser={setUser} />;
+  if (page === "dog") return <DogBooking onBack={() => setPage("home")} />;
+  return <Home user={user} setUser={setUser} onDog={() => setPage("dog")} />;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -117,7 +118,7 @@ function Signup({ onDone }) {
 // ══════════════════════════════════════════════════════════
 //  HOME — single scroll page
 // ══════════════════════════════════════════════════════════
-function Home({ user, setUser }) {
+function Home({ user, setUser, onDog }) {
   const [streak, setStreak] = useState(user.day_streak || 0);
   const [last, setLast] = useState(user.last_checkin);
 
@@ -177,7 +178,7 @@ function Home({ user, setUser }) {
       </header>
 
       {/* GLOW SCORE — hero */}
-      <GlowScore glow={glow} />
+      <GlowScore glow={glow} onDog={onDog} />
 
       {/* STREAK */}
       <div style={card} className="fadeUp">
@@ -224,11 +225,12 @@ function Home({ user, setUser }) {
 }
 
 // ── GLOW SCORE ring ───────────────────────────────────────
-function GlowScore({ glow }) {
+function GlowScore({ glow, onDog }) {
   const R = 70, C = 2 * Math.PI * R;
   const off = C - (glow / 100) * C;
   return (
-    <div style={{ ...card, textAlign: "center", paddingTop: 28 }} className="fadeUp">
+    <div style={{ ...card, textAlign: "center", paddingTop: 28, position: "relative" }} className="fadeUp">
+      <button onClick={onDog} aria-label="Dog sitting" style={{ position: "absolute", top: 14, right: 14, background: "#fdf2f0", border: `1px solid ${ACCENT}33`, borderRadius: 99, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16 }}>🐾</button>
       <p style={cardLabel}>Your Glow Score</p>
       <div style={{ position: "relative", width: 180, height: 180, margin: "10px auto 4px" }}>
         <svg width="180" height="180" style={{ transform: "rotate(-90deg)" }}>
@@ -534,6 +536,140 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
       <input type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)}
         style={{ width: "100%", border: "1px solid #e7dcdb", borderRadius: 12, padding: 14, fontSize: 16, fontFamily: "inherit", boxSizing: "border-box" }} />
     </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+//  DOG BOOKING
+// ══════════════════════════════════════════════════════════
+function DogBooking({ onBack }) {
+  const [step, setStep] = useState(1);
+  const [dogs, setDogs] = useState(1);
+  const [days, setDays] = useState(3);
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", dogName: "", breed: "", date: "", notes: "" });
+  const [extras, setExtras] = useState([]);
+  const RATE = 30;
+  const total = dogs * days * RATE;
+
+  const toggleExtra = (e) => setExtras(ex => ex.includes(e) ? ex.filter(x => x !== e) : [...ex, e]);
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const dogCard = { background: "#fff", borderRadius: 22, padding: 20, margin: "12px 0", boxShadow: "0 4px 20px rgba(0,0,0,.05)", border: "1px solid #ede8e8" };
+  const dogLabel = { color: "#999", fontSize: 11, letterSpacing: 1, textTransform: "uppercase", fontWeight: 600, margin: "0 0 12px" };
+  const dogInput = { width: "100%", border: "1px solid #ede8e8", borderRadius: 10, padding: "11px 13px", fontSize: 15, fontFamily: "inherit", color: DARK, background: "#fff", outline: "none", boxSizing: "border-box" };
+
+  return (
+    <Shell>
+      <style>{globalCss}</style>
+      <div style={{ padding: "24px 4px 8px", display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={onBack} style={{ background: "#f5f0f0", border: "none", borderRadius: 99, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+        <div>
+          <p style={{ color: "#999", margin: 0, fontSize: 13 }}>paw by bliss</p>
+          <h1 style={{ ...serif, fontSize: 24, color: DARK, margin: 0 }}>dog sitting 🐾</h1>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 5 }}>
+          {[1,2,3].map(n => <div key={n} style={{ width: 7, height: 7, borderRadius: 99, background: step >= n ? ACCENT : "#eee", transition: "background .3s" }} />)}
+        </div>
+      </div>
+
+      {step === 1 && (
+        <>
+          <div style={dogCard}>
+            <p style={dogLabel}>number of dogs</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <button onClick={() => setDogs(d => Math.max(1, d - 1))} disabled={dogs <= 1}
+                style={{ width: 42, height: 42, borderRadius: 99, border: "1px solid #ede8e8", background: "#fff", fontSize: 20, cursor: "pointer", opacity: dogs <= 1 ? .3 : 1 }}>−</button>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ ...serif, fontSize: 56, color: DARK, lineHeight: 1 }}>{dogs}</div>
+                <div style={{ color: "#999", fontSize: 13, marginTop: 4 }}>{dogs === 1 ? "dog" : "dogs"}</div>
+              </div>
+              <button onClick={() => setDogs(d => Math.min(10, d + 1))} disabled={dogs >= 10}
+                style={{ width: 42, height: 42, borderRadius: 99, border: "1px solid #ede8e8", background: "#fff", fontSize: 20, cursor: "pointer", opacity: dogs >= 10 ? .3 : 1 }}>+</button>
+            </div>
+          </div>
+
+          <div style={dogCard}>
+            <p style={dogLabel}>length of stay</p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+              <div>
+                <span style={{ ...serif, fontSize: 40, color: DARK, lineHeight: 1 }}>{days}</span>
+                <span style={{ color: "#999", fontSize: 14, marginLeft: 4 }}>{days === 1 ? "day" : "days"}</span>
+              </div>
+              <span style={{ background: "#fdf2f0", border: `1px solid ${ACCENT}33`, borderRadius: 99, padding: "5px 14px", fontSize: 13, fontWeight: 600, color: ACCENT }}>£{RATE}/day</span>
+            </div>
+            <input type="range" min="1" max="30" step="1" value={days} onChange={e => setDays(parseInt(e.target.value))}
+              style={{ width: "100%", accentColor: ACCENT, height: 4, cursor: "pointer" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#bbb", marginTop: 6 }}>
+              <span>1 day</span><span>30 days</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fdf2f0", border: `1px solid ${ACCENT}33`, borderRadius: 18, padding: "16px 20px", margin: "12px 0 20px" }}>
+            <span style={{ color: "#999", fontSize: 14 }}>total</span>
+            <span style={{ ...serif, fontSize: 30, color: DARK }}>£{total.toLocaleString()}</span>
+          </div>
+
+          <button style={primaryBtn} onClick={() => setStep(2)}>continue</button>
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          <div style={dogCard}>
+            <p style={dogLabel}>about you</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <input style={dogInput} placeholder="First name" value={form.firstName} onChange={e => setF("firstName", e.target.value)} />
+              <input style={dogInput} placeholder="Last name" value={form.lastName} onChange={e => setF("lastName", e.target.value)} />
+            </div>
+            <input style={{ ...dogInput, marginBottom: 10 }} placeholder="Email" type="email" value={form.email} onChange={e => setF("email", e.target.value)} />
+            <input style={dogInput} placeholder="Phone" type="tel" value={form.phone} onChange={e => setF("phone", e.target.value)} />
+          </div>
+
+          <div style={dogCard}>
+            <p style={dogLabel}>about your dog</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <input style={dogInput} placeholder="Dog's name" value={form.dogName} onChange={e => setF("dogName", e.target.value)} />
+              <input style={dogInput} placeholder="Breed" value={form.breed} onChange={e => setF("breed", e.target.value)} />
+            </div>
+            <input style={{ ...dogInput, marginBottom: 10 }} placeholder="Drop-off date e.g. 10 July" value={form.date} onChange={e => setF("date", e.target.value)} />
+            <textarea style={{ ...dogInput, resize: "none" }} rows={3} placeholder="Anything we should know? Allergies, favourite toys…" value={form.notes} onChange={e => setF("notes", e.target.value)} />
+          </div>
+
+          <div style={dogCard}>
+            <p style={dogLabel}>extras</p>
+            {["Daily photo updates", "Two walks per day", "Grooming on collection day"].map(e => (
+              <div key={e} onClick={() => toggleExtra(e)}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", border: `1px solid ${extras.includes(e) ? ACCENT : "#ede8e8"}`, borderRadius: 12, marginBottom: 10, cursor: "pointer", background: extras.includes(e) ? "#fdf2f0" : "#fff", transition: "all .2s" }}>
+                <div style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${extras.includes(e) ? ACCENT : "#ddd"}`, background: extras.includes(e) ? ACCENT : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {extras.includes(e) && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
+                </div>
+                <span style={{ fontSize: 14, color: DARK }}>{e}</span>
+              </div>
+            ))}
+          </div>
+
+          <button style={primaryBtn} onClick={() => setStep(3)}>confirm booking</button>
+          <button style={ghostBtn} onClick={() => setStep(1)}>← back</button>
+        </>
+      )}
+
+      {step === 3 && (
+        <div style={{ textAlign: "center", paddingTop: 40 }}>
+          <div style={{ width: 64, height: 64, borderRadius: 99, background: "#fdf2f0", border: `1px solid ${ACCENT}33`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 28 }}>🐾</div>
+          <h2 style={{ ...serif, fontSize: 30, color: DARK, margin: "0 0 8px" }}>you're booked</h2>
+          <p style={{ color: "#999", fontSize: 14, margin: "0 0 28px", lineHeight: 1.6 }}>We'll be in touch within a couple of hours to confirm everything.</p>
+          <div style={dogCard}>
+            <p style={dogLabel}>summary</p>
+            {[["dogs", `${dogs} ${dogs === 1 ? "dog" : "dogs"}`], ["stay", `${days} ${days === 1 ? "day" : "days"}`], ["total", `£${total.toLocaleString()}`]].map(([l, v]) => (
+              <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f3eeed", fontSize: 14 }}>
+                <span style={{ color: "#999" }}>{l}</span><span style={{ fontWeight: 600 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <button style={{ ...primaryBtn, marginTop: 20 }} onClick={onBack}>back to bliss</button>
+        </div>
+      )}
+    </Shell>
   );
 }
 
