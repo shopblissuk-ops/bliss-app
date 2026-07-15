@@ -26,6 +26,14 @@ const ls = {
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
+// ── Ambassador reward tiers (shared by rewards page + dashboard) ──
+const TIERS = [
+  { threshold: 10, label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
+  { threshold: 100, label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
+  { threshold: 200, label: "top performer", reward: "New Laptop", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
+  { threshold: 1000, label: "elite ambassador", reward: "iPhone + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
+];
+
 // ══════════════════════════════════════════════════════════
 //  TOP LEVEL — real routes. /rewards is public, everything else
 //  goes through the normal install/signup flow.
@@ -35,6 +43,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/rewards" element={<AmbassadorPage standalone />} />
+        <Route path="/admin" element={<AdminPanel />} />
         <Route path="/*" element={<MainApp />} />
       </Routes>
     </BrowserRouter>
@@ -577,18 +586,12 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
 // ══════════════════════════════════════════════════════════
 function AmbassadorPage({ standalone }) {
   const navigate = useNavigate();
-  const [mode, setMode] = useState("choice"); // choice | form | submitted
+  const [savedUsername, setSavedUsername] = useState(() => ls.get("bliss_ambassador_username", null));
+  const [mode, setMode] = useState(() => (ls.get("bliss_ambassador_username", null) ? "dashboard" : "choice"));
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
 
   const NEEDS_SAMPLE_URL = "https://affiliate.tiktok.com/api/v1/oec/affiliate/seller/invitation_group/share/long_url/AIza2BnjZ9d1";
-
-  const TIERS = [
-    { sales: "10 sales", label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
-    { sales: "100 sales", label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
-    { sales: "200 sales", label: "top performer", reward: "New Laptop", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
-    { sales: "1,000 sales", label: "elite ambassador", reward: "iPhone + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
-  ];
 
   const submit = async (e) => {
     e.preventDefault();
@@ -596,13 +599,25 @@ function AmbassadorPage({ standalone }) {
     const clean = username.trim().replace(/^@/, "");
     if (!clean) { setError("Enter your TikTok username"); return; }
     try {
-      await supabase.from("ambassador_applicants").insert({ tiktok_username: clean });
-      setMode("submitted");
+      await supabase.from("ambassador_applicants").upsert({ tiktok_username: clean }, { onConflict: "tiktok_username" });
+      ls.set("bliss_ambassador_username", clean);
+      setSavedUsername(clean);
+      setMode("dashboard");
     } catch (err) {
       console.error(err);
       setError("Something went wrong, try again");
     }
   };
+
+  if (mode === "dashboard") {
+    return (
+      <AmbassadorDashboard
+        username={savedUsername}
+        standalone={standalone}
+        onSwitch={() => { ls.set("bliss_ambassador_username", null); setSavedUsername(null); setMode("choice"); }}
+      />
+    );
+  }
 
   return (
     <Shell>
@@ -625,12 +640,12 @@ function AmbassadorPage({ standalone }) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
           {TIERS.map((t, i) => (
-            <div key={t.sales} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.08}s` }}>
+            <div key={t.label} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.08}s` }}>
               <div className="tierIcon" style={{ background: t.grad }}>
                 <span className="tierIconEmoji">{t.icon}</span>
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.sales}</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
                 <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
               </div>
               <div className="tierBadge" style={{ background: t.grad }}>
@@ -664,18 +679,243 @@ function AmbassadorPage({ standalone }) {
           </form>
         )}
 
-        {mode === "submitted" && (
-          <p style={{ color: ACCENT, fontWeight: 600, fontSize: 14, textAlign: "center" }}>
-            You're in — we'll track your sales against @{username.replace(/^@/, "")}.
-          </p>
-        )}
-
         {error && <p style={{ color: "#d85a30", fontSize: 13, marginTop: 8 }}>{error}</p>}
 
         <p style={{ fontSize: 11, color: "#ccc", marginTop: 20, lineHeight: 1.6 }}>
           Rewards are calculated on verified, non-refunded sales made through your unique referral link only. Self-purchases and fraudulent activity void eligibility. Full terms sent on approval.
         </p>
       </div>
+    </Shell>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+//  AMBASSADOR DASHBOARD
+// ══════════════════════════════════════════════════════════
+function AmbassadorDashboard({ username, standalone, onSwitch }) {
+  const navigate = useNavigate();
+  const [row, setRow] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshState, setRefreshState] = useState("idle"); // idle | sending | sent
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase.from("ambassador_applicants").select("*").eq("tiktok_username", username).maybeSingle();
+      setRow(data);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [username]);
+
+  const requestRefresh = async () => {
+    if (refreshState !== "idle") return;
+    setRefreshState("sending");
+    try {
+      await supabase.from("ambassador_applicants").update({
+        refresh_requested: true,
+        refresh_requested_at: new Date().toISOString(),
+      }).eq("tiktok_username", username);
+      setRefreshState("sent");
+      setTimeout(() => setRefreshState("idle"), 20000);
+    } catch (e) {
+      console.error(e);
+      setRefreshState("idle");
+    }
+  };
+
+  const sales = row?.sales_count ?? 0;
+  const currentTierIndex = TIERS.reduce((acc, t, i) => (sales >= t.threshold ? i : acc), -1);
+  const nextTier = TIERS[currentTierIndex + 1];
+  const prevThreshold = currentTierIndex >= 0 ? TIERS[currentTierIndex].threshold : 0;
+  const progressPct = nextTier
+    ? Math.min(100, Math.round(((sales - prevThreshold) / (nextTier.threshold - prevThreshold)) * 100))
+    : 100;
+
+  return (
+    <Shell>
+      <style>{globalCss}</style>
+      <style>{ambassadorCss}</style>
+      <div style={{ padding: "24px 4px 8px", display: "flex", alignItems: "center", gap: 12 }}>
+        {!standalone && (
+          <button onClick={() => navigate(-1)} style={{ background: "#f5f0f0", border: "none", borderRadius: 99, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+        )}
+        <div>
+          <p style={{ color: "#999", margin: 0, fontSize: 13 }}>bliss for you</p>
+          <h1 style={{ ...serif, fontSize: 24, color: DARK, margin: 0 }}>@{username}</h1>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={card}><p style={{ color: "#aaa", fontSize: 13 }}>Loading your dashboard…</p></div>
+      ) : (
+        <>
+          <div className="dashHero fadeUp">
+            <p style={cardLabel}>Your verified sales</p>
+            <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
+              <span className="dashSalesNum">{sales}</span>
+            </div>
+            {nextTier ? (
+              <>
+                <div className="progressTrack">
+                  <div className="progressFill" style={{ width: `${progressPct}%` }}>
+                    <span className="progressShimmer" />
+                  </div>
+                </div>
+                <p style={{ color: "#999", fontSize: 12, textAlign: "center", margin: "8px 0 0" }}>
+                  {nextTier.threshold - sales > 0 ? `${nextTier.threshold - sales} sales to ${nextTier.reward}` : "Almost there!"}
+                </p>
+              </>
+            ) : (
+              <p style={{ color: ACCENT, fontSize: 13, textAlign: "center", fontWeight: 600 }}>You've unlocked every tier 🎉</p>
+            )}
+            <button className="refreshBtn" onClick={requestRefresh} disabled={refreshState !== "idle"}>
+              {refreshState === "idle" && "↻ Refresh my stats"}
+              {refreshState === "sending" && "Sending request…"}
+              {refreshState === "sent" && "Request sent ✓"}
+            </button>
+          </div>
+
+          <div className="dashTiers fadeUp">
+            <p style={cardLabel}>Reward tiers</p>
+            {TIERS.map((t, i) => {
+              const state = sales >= t.threshold ? "unlocked" : (i === currentTierIndex + 1 ? "current" : "locked");
+              return (
+                <div key={t.label} className={`tierRow tierRow--${state}`}>
+                  <div className="tierIcon" style={{ background: state === "locked" ? "#eee" : t.grad }}>
+                    <span className={state === "locked" ? "" : "tierIconEmoji"}>{state === "unlocked" ? "✓" : t.icon}</span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: state === "locked" ? "#bbb" : DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
+                    <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
+                  </div>
+                  <div className="tierBadge" style={{ background: state === "locked" ? "#f2f2f2" : t.grad }}>
+                    {state !== "locked" && <span className="tierShimmer" />}
+                    <span style={{ position: "relative", zIndex: 1, color: state === "locked" ? "#bbb" : "#2C2C2C" }}>{t.reward}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={card} className="fadeUp">
+            <p style={cardLabel}>How to sell more</p>
+            <p style={{ color: "#999", fontSize: 13, margin: "8px 0 16px" }}>Quick tips from creators who convert well.</p>
+            {CONTENT_TIPS.map((v) => (
+              <div key={v.title} className="videoCard">
+                <div className="videoThumb">▶</div>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{v.title}</p>
+                  <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{v.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button style={{ ...ghostBtn, marginTop: 4 }} onClick={onSwitch}>Not you? Switch account</button>
+        </>
+      )}
+    </Shell>
+  );
+}
+
+const CONTENT_TIPS = [
+  { title: "Hook in the first 2 seconds", desc: "Open with the result or a bold claim — don't start with 'hey guys'." },
+  { title: "Show the product in use", desc: "Hold the bottle, show the routine — viewers convert better when they see it in hand." },
+  { title: "Keep it under 30 seconds", desc: "Short, punchy videos outperform long explainers for supplement content." },
+  { title: "Post consistently", desc: "One good video beats none — but 3 a week beats 1 a month for algorithm reach." },
+];
+
+// ══════════════════════════════════════════════════════════
+//  ADMIN PANEL — /admin — basic PIN gate, edit sales counts
+// ══════════════════════════════════════════════════════════
+function AdminPanel() {
+  const [authed, setAuthed] = useState(false);
+  const [pin, setPin] = useState("");
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [edits, setEdits] = useState({});
+
+  const ADMIN_PIN = "bliss2026"; // change this to your own PIN
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from("ambassador_applicants")
+        .select("*")
+        .order("refresh_requested", { ascending: false })
+        .order("created_at", { ascending: false });
+      setRows(data || []);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { if (authed) load(); }, [authed]);
+
+  const save = async (row) => {
+    const raw = edits[row.id];
+    const newCount = raw !== undefined ? parseInt(raw, 10) : row.sales_count;
+    try {
+      await supabase.from("ambassador_applicants").update({
+        sales_count: isNaN(newCount) ? row.sales_count : newCount,
+        refresh_requested: false,
+      }).eq("id", row.id);
+      load();
+    } catch (e) { console.error(e); }
+  };
+
+  if (!authed) {
+    return (
+      <Shell>
+        <style>{globalCss}</style>
+        <div style={{ ...card, marginTop: 60, textAlign: "center" }}>
+          <h1 style={{ ...serif, fontSize: 28, color: DARK, margin: "0 0 16px" }}>admin</h1>
+          <Field label="PIN" value={pin} onChange={setPin} placeholder="Enter PIN" type="password" />
+          <button style={primaryBtn} onClick={() => setAuthed(pin === ADMIN_PIN)}>Enter</button>
+        </div>
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell>
+      <style>{globalCss}</style>
+      <div style={{ padding: "24px 4px 8px" }}>
+        <h1 style={{ ...serif, fontSize: 26, color: DARK, margin: 0 }}>ambassador admin</h1>
+        <p style={{ color: "#999", fontSize: 13, margin: "4px 0 0" }}>{rows.length} applicants</p>
+      </div>
+
+      {loading ? (
+        <p style={{ color: "#aaa", fontSize: 13 }}>Loading…</p>
+      ) : (
+        rows.map((r) => (
+          <div key={r.id} style={{ ...card, padding: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+              <div>
+                <p style={{ fontWeight: 600, color: DARK, margin: "0 0 2px" }}>@{r.tiktok_username}</p>
+                <p style={{ color: "#bbb", fontSize: 11, margin: 0 }}>Joined {new Date(r.created_at).toLocaleDateString()}</p>
+              </div>
+              {r.refresh_requested && (
+                <span style={{ background: "#fdf2f0", color: ACCENT, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 99, border: `1px solid ${ACCENT}44` }}>
+                  Refresh requested
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="number"
+                defaultValue={r.sales_count}
+                onChange={(e) => setEdits((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                style={{ width: 90, border: "1px solid #e7dcdb", borderRadius: 10, padding: "10px 12px", fontSize: 14, fontFamily: "inherit" }}
+              />
+              <span style={{ color: "#999", fontSize: 13 }}>sales</span>
+              <button style={{ ...primaryBtn, width: "auto", padding: "10px 18px", marginLeft: "auto" }} onClick={() => save(r)}>Save</button>
+            </div>
+          </div>
+        ))
+      )}
     </Shell>
   );
 }
@@ -732,6 +972,108 @@ const ambassadorCss = `
     0% { left: -60%; }
     60% { left: 130%; }
     100% { left: 130%; }
+  }
+
+  .dashHero {
+    background: linear-gradient(180deg, #fff, #fdf7f6);
+    border: 1px solid ${ACCENT}33;
+    border-radius: 26px;
+    padding: 26px 20px;
+    margin: 14px 0;
+    text-align: center;
+  }
+  .dashSalesNum {
+    font-family: 'Cormorant', Georgia, serif;
+    font-weight: 700;
+    font-size: 64px;
+    color: ${DARK};
+    text-shadow: 0 0 24px ${ACCENT}55;
+    line-height: 1;
+  }
+  .progressTrack {
+    width: 100%;
+    height: 10px;
+    background: #f0e8e7;
+    border-radius: 99px;
+    overflow: hidden;
+    margin-top: 18px;
+  }
+  .progressFill {
+    height: 100%;
+    background: linear-gradient(90deg, ${ACCENT}, #e0a89f);
+    border-radius: 99px;
+    position: relative;
+    overflow: hidden;
+    transition: width .6s ease;
+  }
+  .progressShimmer {
+    position: absolute;
+    top: 0; left: -60%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,.8), transparent);
+    animation: shimmerSweep 2.2s ease-in-out infinite;
+  }
+  .refreshBtn {
+    margin-top: 20px;
+    width: 100%;
+    background: #fff;
+    border: 1.5px solid ${ACCENT}55;
+    color: ${ACCENT};
+    font-weight: 600;
+    font-size: 14px;
+    padding: 13px;
+    border-radius: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .refreshBtn:disabled { opacity: .6; cursor: default; }
+
+  .dashTiers {
+    background: #fff;
+    border-radius: 26px;
+    padding: 18px;
+    margin: 14px 0;
+    border: 1px solid ${ACCENT}22;
+    box-shadow: 0 6px 24px rgba(0,0,0,.05);
+  }
+  .tierRow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3eeed;
+  }
+  .tierRow:last-child { border-bottom: none; }
+  .tierRow--current .tierIcon {
+    box-shadow: 0 0 0 4px ${ACCENT}22, 0 4px 12px rgba(0,0,0,.14);
+    animation: pulseRing 1.8s ease-in-out infinite;
+  }
+  @keyframes pulseRing {
+    0%, 100% { box-shadow: 0 0 0 4px ${ACCENT}22, 0 4px 12px rgba(0,0,0,.14); }
+    50% { box-shadow: 0 0 0 8px ${ACCENT}11, 0 4px 12px rgba(0,0,0,.14); }
+  }
+  .tierRow--locked { opacity: .55; }
+
+  .videoCard {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3eeed;
+  }
+  .videoCard:last-child { border-bottom: none; }
+  .videoThumb {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, ${ACCENT}, #e0a89f);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
   }
 `;
 
