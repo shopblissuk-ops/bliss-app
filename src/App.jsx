@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { BrowserRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 
 // ── Supabase ──────────────────────────────────────────────
@@ -25,7 +26,22 @@ const ls = {
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
+// ══════════════════════════════════════════════════════════
+//  TOP LEVEL — real routes. /rewards is public, everything else
+//  goes through the normal install/signup flow.
+// ══════════════════════════════════════════════════════════
 export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/rewards" element={<AmbassadorPage standalone />} />
+        <Route path="/*" element={<MainApp />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function MainApp() {
   const [user, setUser] = useState(() => ls.get("bliss_user", null));
   const [installed, setInstalled] = useState(
     () => window.matchMedia("(display-mode: standalone)").matches || ls.get("bliss_installed", false)
@@ -35,8 +51,7 @@ export default function App() {
   if (!installed) return <InstallGate onDone={() => { ls.set("bliss_installed", true); setInstalled(true); }} />;
   if (!user) return <Signup onDone={(u) => { ls.set("bliss_user", u); setUser(u); }} />;
   if (page === "dog") return <DogBooking onBack={() => setPage("home")} />;
-  if (page === "rewards") return <AmbassadorPage onBack={() => setPage("home")} />;
-  return <Home user={user} setUser={setUser} onDog={() => setPage("dog")} onRewards={() => setPage("rewards")} />;
+  return <Home user={user} setUser={setUser} onDog={() => setPage("dog")} />;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -119,7 +134,7 @@ function Signup({ onDone }) {
 // ══════════════════════════════════════════════════════════
 //  HOME — single scroll page
 // ══════════════════════════════════════════════════════════
-function Home({ user, setUser, onDog, onRewards }) {
+function Home({ user, setUser, onDog }) {
   const [streak, setStreak] = useState(user.day_streak || 0);
   const [last, setLast] = useState(user.last_checkin);
 
@@ -213,7 +228,7 @@ function Home({ user, setUser, onDog, onRewards }) {
       <ShopCard />
 
       {/* AMBASSADOR PROGRAM */}
-      <AmbassadorCard onOpen={onRewards} />
+      <AmbassadorCard />
 
       {streak >= 27 && (
         <div style={{ ...card, background: "#fff4f2", borderColor: ACCENT }}>
@@ -522,14 +537,14 @@ function ShopCard() {
 }
 
 // ── AMBASSADOR TEASER CARD (on Home) ──────────────────────
-function AmbassadorCard({ onOpen }) {
+function AmbassadorCard() {
   return (
     <div style={card} className="fadeUp">
       <p style={cardLabel}>Become an ambassador</p>
       <p style={{ color: "#888", fontSize: 14, margin: "8px 0 14px", lineHeight: 1.5 }}>
         Share your link, earn cash and prizes as your referrals grow.
       </p>
-      <button style={primaryBtn} onClick={onOpen}>See rewards</button>
+      <Link to="/rewards" style={{ ...primaryBtn, display: "block", textAlign: "center", textDecoration: "none", boxSizing: "border-box" }}>See rewards</Link>
     </div>
   );
 }
@@ -557,9 +572,11 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
 }
 
 // ══════════════════════════════════════════════════════════
-//  AMBASSADOR / REWARDS PAGE
+//  AMBASSADOR / REWARDS PAGE — public, works at /rewards
+//  without needing the app installed or an account.
 // ══════════════════════════════════════════════════════════
-function AmbassadorPage({ onBack }) {
+function AmbassadorPage({ standalone }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -589,7 +606,9 @@ function AmbassadorPage({ onBack }) {
     <Shell>
       <style>{globalCss}</style>
       <div style={{ padding: "24px 4px 8px", display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={onBack} style={{ background: "#f5f0f0", border: "none", borderRadius: 99, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+        {!standalone && (
+          <button onClick={() => navigate(-1)} style={{ background: "#f5f0f0", border: "none", borderRadius: 99, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+        )}
         <div>
           <p style={{ color: "#999", margin: 0, fontSize: 13 }}>bliss for you</p>
           <h1 style={{ ...serif, fontSize: 24, color: DARK, margin: 0 }}>become an ambassador</h1>
