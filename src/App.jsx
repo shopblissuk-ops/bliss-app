@@ -27,7 +27,14 @@ const ls = {
 };
 
 // ── Ambassador reward tiers (shared by rewards page + dashboard) ──
-const TIERS = [
+const TIERS_TIKTOK = [
+  { threshold: 15, label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
+  { threshold: 150, label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
+  { threshold: 300, label: "top performer", reward: "MacBook Air", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
+  { threshold: 1500, label: "elite ambassador", reward: "iPhone 17 + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
+];
+
+const TIERS_SHOPIFY = [
   { threshold: 10, label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
   { threshold: 100, label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
   { threshold: 200, label: "top performer", reward: "MacBook Air", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
@@ -583,22 +590,27 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
 // ══════════════════════════════════════════════════════════
 function AmbassadorPage({ standalone }) {
   const navigate = useNavigate();
-  const [savedUsername, setSavedUsername] = useState(() => ls.get("bliss_ambassador_username", null));
-  const [mode, setMode] = useState(() => (ls.get("bliss_ambassador_username", null) ? "dashboard" : "choice"));
+  const [saved, setSaved] = useState(() => ls.get("bliss_ambassador", null)); // { handle, channel }
+  const [mode, setMode] = useState(() => (ls.get("bliss_ambassador", null) ? "dashboard" : "channel"));
+  const [channel, setChannel] = useState(null); // "tiktok" | "shopify"
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
 
   const NEEDS_SAMPLE_URL = "https://affiliate.tiktok.com/api/v1/oec/affiliate/seller/invitation_group/share/long_url/AIza2BnjZ9d1";
+  const TIERS = channel === "shopify" ? TIERS_SHOPIFY : TIERS_TIKTOK;
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
     const clean = username.trim().replace(/^@/, "");
-    if (!clean) { setError("Enter your TikTok username"); return; }
+    if (!clean) { setError(channel === "shopify" ? "Enter your name or handle" : "Enter your TikTok username"); return; }
     try {
-      await supabase.from("ambassador_applicants").upsert({ tiktok_username: clean }, { onConflict: "tiktok_username" });
-      ls.set("bliss_ambassador_username", clean);
-      setSavedUsername(clean);
+      await supabase.from("ambassador_applicants").upsert(
+        { handle: clean, channel },
+        { onConflict: "handle,channel" }
+      );
+      ls.set("bliss_ambassador", { handle: clean, channel });
+      setSaved({ handle: clean, channel });
       setMode("dashboard");
     } catch (err) {
       console.error(err);
@@ -606,12 +618,13 @@ function AmbassadorPage({ standalone }) {
     }
   };
 
-  if (mode === "dashboard") {
+  if (mode === "dashboard" && saved) {
     return (
       <AmbassadorDashboard
-        username={savedUsername}
+        handle={saved.handle}
+        channel={saved.channel}
         standalone={standalone}
-        onSwitch={() => { ls.set("bliss_ambassador_username", null); setSavedUsername(null); setMode("choice"); }}
+        onSwitch={() => { ls.set("bliss_ambassador", null); setSaved(null); setChannel(null); setMode("channel"); }}
       />
     );
   }
@@ -635,23 +648,33 @@ function AmbassadorPage({ standalone }) {
           Share your link, earn cash and prizes as your referrals grow. No follower minimum, no application fee.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-          {TIERS.map((t, i) => (
-            <div key={t.label} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.08}s` }}>
-              <div className="tierIcon" style={{ background: t.grad }}>
-                <span className="tierIconEmoji">{t.icon}</span>
+        {mode === "channel" && (
+          <>
+            <p style={{ fontSize: 13, color: "#999", margin: "0 0 12px", textAlign: "center" }}>Where are you promoting us?</p>
+            <button style={primaryBtn} onClick={() => { setChannel("tiktok"); setMode("choice"); }}>TikTok Shop</button>
+            <button style={{ ...primaryBtn, marginTop: 10, background: "#fff", color: ACCENT, border: `1.5px solid ${ACCENT}55` }} onClick={() => { setChannel("shopify"); setMode("form"); }}>My website / social (Shopify)</button>
+          </>
+        )}
+
+        {mode !== "channel" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+            {TIERS.map((t, i) => (
+              <div key={t.label} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.08}s` }}>
+                <div className="tierIcon" style={{ background: t.grad }}>
+                  <span className="tierIconEmoji">{t.icon}</span>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
+                  <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
+                </div>
+                <div className="tierBadge" style={{ background: t.grad }}>
+                  <span className="tierShimmer" />
+                  <span style={{ position: "relative", zIndex: 1 }}>{t.reward}</span>
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
-                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
-              </div>
-              <div className="tierBadge" style={{ background: t.grad }}>
-                <span className="tierShimmer" />
-                <span style={{ position: "relative", zIndex: 1 }}>{t.reward}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {mode === "choice" && (
           <>
@@ -665,14 +688,20 @@ function AmbassadorPage({ standalone }) {
             >
               I need to apply for a sample first
             </button>
+            <button type="button" style={{ ...ghostBtn, marginTop: 4 }} onClick={() => setMode("channel")}>← back</button>
           </>
         )}
 
         {mode === "form" && (
           <form onSubmit={submit}>
-            <Field label="Your TikTok username" value={username} onChange={setUsername} placeholder="@yourusername" />
+            <Field
+              label={channel === "shopify" ? "Your name or handle" : "Your TikTok username"}
+              value={username}
+              onChange={setUsername}
+              placeholder={channel === "shopify" ? "e.g. Ella Smith" : "@yourusername"}
+            />
             <button type="submit" style={primaryBtn}>Confirm & join</button>
-            <button type="button" style={{ ...ghostBtn, marginTop: 4 }} onClick={() => setMode("choice")}>← back</button>
+            <button type="button" style={{ ...ghostBtn, marginTop: 4 }} onClick={() => setMode(channel === "tiktok" ? "choice" : "channel")}>← back</button>
           </form>
         )}
 
@@ -689,22 +718,24 @@ function AmbassadorPage({ standalone }) {
 // ══════════════════════════════════════════════════════════
 //  AMBASSADOR DASHBOARD
 // ══════════════════════════════════════════════════════════
-function AmbassadorDashboard({ username, standalone, onSwitch }) {
+function AmbassadorDashboard({ handle, channel, standalone, onSwitch }) {
   const navigate = useNavigate();
   const [row, setRow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshState, setRefreshState] = useState("idle"); // idle | sending | sent
 
+  const TIERS = channel === "shopify" ? TIERS_SHOPIFY : TIERS_TIKTOK;
+
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from("ambassador_applicants").select("*").eq("tiktok_username", username).maybeSingle();
+      const { data } = await supabase.from("ambassador_applicants").select("*").eq("handle", handle).eq("channel", channel).maybeSingle();
       setRow(data);
     } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [username]);
+  useEffect(() => { load(); }, [handle, channel]);
 
   const requestRefresh = async () => {
     if (refreshState !== "idle") return;
@@ -713,7 +744,7 @@ function AmbassadorDashboard({ username, standalone, onSwitch }) {
       await supabase.from("ambassador_applicants").update({
         refresh_requested: true,
         refresh_requested_at: new Date().toISOString(),
-      }).eq("tiktok_username", username);
+      }).eq("handle", handle).eq("channel", channel);
       setRefreshState("sent");
       setTimeout(() => setRefreshState("idle"), 20000);
     } catch (e) {
@@ -739,8 +770,11 @@ function AmbassadorDashboard({ username, standalone, onSwitch }) {
           <button onClick={() => navigate(-1)} style={{ background: "#f5f0f0", border: "none", borderRadius: 99, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
         )}
         <div>
-          <p style={{ color: "#999", margin: 0, fontSize: 13 }}>bliss for you</p>
-          <h1 style={{ ...serif, fontSize: 24, color: DARK, margin: 0 }}>@{username}</h1>
+          <p style={{ color: "#999", margin: 0, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+            bliss for you
+            <span className={`channelTag channelTag--${channel}`}>{channel === "shopify" ? "Shopify" : "TikTok"}</span>
+          </p>
+          <h1 style={{ ...serif, fontSize: 24, color: DARK, margin: 0 }}>{handle}</h1>
         </div>
       </div>
 
@@ -833,6 +867,7 @@ function AdminPanel() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [edits, setEdits] = useState({});
+  const [filter, setFilter] = useState("all"); // all | tiktok | shopify
 
   const ADMIN_PIN = "bliss2026"; // change this to your own PIN
 
@@ -867,37 +902,65 @@ function AdminPanel() {
     return (
       <Shell>
         <style>{globalCss}</style>
-        <div style={{ ...card, marginTop: 60, textAlign: "center" }}>
-          <h1 style={{ ...serif, fontSize: 28, color: DARK, margin: "0 0 16px" }}>admin</h1>
-          <Field label="PIN" value={pin} onChange={setPin} placeholder="Enter PIN" type="password" />
-          <button style={primaryBtn} onClick={() => setAuthed(pin === ADMIN_PIN)}>Enter</button>
+        <style>{ambassadorCss}</style>
+        <div className="adminLoginCard fadeUp">
+          <div className="adminGlowOrb" />
+          <h1 style={{ ...serif, fontSize: 30, color: DARK, margin: "0 0 6px", position: "relative" }}>admin</h1>
+          <p style={{ color: "#999", fontSize: 13, margin: "0 0 22px", position: "relative" }}>bliss for you · ambassadors</p>
+          <div style={{ position: "relative" }}>
+            <Field label="PIN" value={pin} onChange={setPin} placeholder="Enter PIN" type="password" />
+            <button style={primaryBtn} onClick={() => setAuthed(pin === ADMIN_PIN)}>Enter</button>
+          </div>
         </div>
       </Shell>
     );
   }
 
+  const filtered = filter === "all" ? rows : rows.filter((r) => r.channel === filter);
+  const counts = {
+    all: rows.length,
+    tiktok: rows.filter((r) => r.channel === "tiktok").length,
+    shopify: rows.filter((r) => r.channel === "shopify").length,
+  };
+
   return (
     <Shell>
       <style>{globalCss}</style>
-      <div style={{ padding: "24px 4px 8px" }}>
-        <h1 style={{ ...serif, fontSize: 26, color: DARK, margin: 0 }}>ambassador admin</h1>
-        <p style={{ color: "#999", fontSize: 13, margin: "4px 0 0" }}>{rows.length} applicants</p>
+      <style>{ambassadorCss}</style>
+      <div className="adminHeader fadeUp">
+        <h1 style={{ ...serif, fontSize: 28, color: DARK, margin: 0 }}>ambassador admin</h1>
+        <p style={{ color: "#999", fontSize: 13, margin: "4px 0 0" }}>{rows.length} total applicants</p>
+      </div>
+
+      <div className="adminTabs fadeUp">
+        {[
+          { key: "all", label: "All" },
+          { key: "tiktok", label: "TikTok" },
+          { key: "shopify", label: "Shopify" },
+        ].map((t) => (
+          <button key={t.key} className={`adminTab ${filter === t.key ? "adminTab--active" : ""}`} onClick={() => setFilter(t.key)}>
+            {t.label} <span className="adminTabCount">{counts[t.key]}</span>
+          </button>
+        ))}
       </div>
 
       {loading ? (
         <p style={{ color: "#aaa", fontSize: 13 }}>Loading…</p>
+      ) : filtered.length === 0 ? (
+        <p style={{ color: "#aaa", fontSize: 13 }}>No applicants in this view yet.</p>
       ) : (
-        rows.map((r) => (
-          <div key={r.id} style={{ ...card, padding: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+        filtered.map((r, i) => (
+          <div key={r.id} className="adminCard fadeUp" style={{ animationDelay: `${i * 0.05}s` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
               <div>
-                <p style={{ fontWeight: 600, color: DARK, margin: "0 0 2px" }}>@{r.tiktok_username}</p>
-                <p style={{ color: "#bbb", fontSize: 11, margin: 0 }}>Joined {new Date(r.created_at).toLocaleDateString()}</p>
+                <p style={{ fontWeight: 700, color: DARK, margin: "0 0 4px", fontSize: 15 }}>{r.handle}</p>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span className={`channelTag channelTag--${r.channel}`}>{r.channel === "shopify" ? "Shopify" : "TikTok"}</span>
+                  <span style={{ color: "#bbb", fontSize: 11 }}>Joined {new Date(r.created_at).toLocaleDateString()}</span>
+                </div>
               </div>
               {r.refresh_requested && (
-                <span style={{ background: "#fdf2f0", color: ACCENT, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 99, border: `1px solid ${ACCENT}44` }}>
-                  Refresh requested
-                </span>
+                <span className="adminPulseBadge">Refresh requested</span>
               )}
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -905,7 +968,7 @@ function AdminPanel() {
                 type="number"
                 defaultValue={r.sales_count}
                 onChange={(e) => setEdits((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                style={{ width: 90, border: "1px solid #e7dcdb", borderRadius: 10, padding: "10px 12px", fontSize: 14, fontFamily: "inherit" }}
+                className="adminInput"
               />
               <span style={{ color: "#999", fontSize: 13 }}>sales</span>
               <button style={{ ...primaryBtn, width: "auto", padding: "10px 18px", marginLeft: "auto" }} onClick={() => save(r)}>Save</button>
@@ -918,6 +981,109 @@ function AdminPanel() {
 }
 
 const ambassadorCss = `
+  .channelTag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 99px;
+    display: inline-block;
+  }
+  .channelTag--tiktok {
+    background: #1a1a1a;
+    color: #fff;
+  }
+  .channelTag--shopify {
+    background: #eaf6ee;
+    color: #2f9e5a;
+    border: 1px solid #b9e5c8;
+  }
+
+  .adminLoginCard {
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    margin-top: 60px;
+    padding: 36px 24px;
+    background: linear-gradient(180deg, #fff, #fdf7f6);
+    border: 1px solid ${ACCENT}33;
+    border-radius: 28px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.08);
+  }
+  .adminGlowOrb {
+    position: absolute;
+    top: -60px; left: 50%;
+    transform: translateX(-50%);
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, ${ACCENT}44, transparent 70%);
+    filter: blur(10px);
+    animation: orbPulse 4s ease-in-out infinite;
+  }
+  @keyframes orbPulse {
+    0%, 100% { opacity: .5; transform: translateX(-50%) scale(1); }
+    50% { opacity: .9; transform: translateX(-50%) scale(1.15); }
+  }
+
+  .adminHeader {
+    padding: 24px 4px 8px;
+  }
+  .adminTabs {
+    display: flex;
+    gap: 8px;
+    margin: 14px 0 18px;
+  }
+  .adminTab {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #f0e8e7;
+    border-radius: 14px;
+    padding: 10px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .2s;
+  }
+  .adminTab--active {
+    background: ${DARK};
+    border-color: ${DARK};
+    color: #fff;
+  }
+  .adminTabCount {
+    opacity: .6;
+    font-weight: 400;
+  }
+  .adminCard {
+    background: #fff;
+    border-radius: 22px;
+    padding: 18px;
+    margin: 12px 0;
+    border: 1px solid ${ACCENT}22;
+    box-shadow: 0 6px 20px rgba(0,0,0,.05);
+    transition: box-shadow .2s;
+  }
+  .adminInput {
+    width: 90px;
+    border: 1px solid #e7dcdb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .adminPulseBadge {
+    background: #fdf2f0;
+    color: ${ACCENT};
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 11px;
+    border-radius: 99px;
+    border: 1px solid ${ACCENT}55;
+    animation: pulseRing 1.6s ease-in-out infinite;
+    white-space: nowrap;
+  }
+
   .tierCard {
     display: flex;
     align-items: center;
