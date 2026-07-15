@@ -27,18 +27,11 @@ const ls = {
 };
 
 // ── Ambassador reward tiers (shared by rewards page + dashboard) ──
-const TIERS_TIKTOK = [
+const TIERS = [
   { threshold: 15, label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
   { threshold: 150, label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
   { threshold: 300, label: "top performer", reward: "MacBook Air", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
   { threshold: 1500, label: "elite ambassador", reward: "iPhone 17 + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
-];
-
-const TIERS_SHOPIFY = [
-  { threshold: 10, label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
-  { threshold: 100, label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
-  { threshold: 200, label: "top performer", reward: "MacBook Air", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
-  { threshold: 1000, label: "elite ambassador", reward: "iPhone 17 + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
 ];
 
 // ══════════════════════════════════════════════════════════
@@ -590,41 +583,31 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
 // ══════════════════════════════════════════════════════════
 function AmbassadorPage({ standalone }) {
   const navigate = useNavigate();
-  const [saved, setSaved] = useState(() => ls.get("bliss_ambassador", null)); // { handle, channel }
-  const [mode, setMode] = useState(() => (ls.get("bliss_ambassador", null) ? "dashboard" : "channel"));
-  const [channel, setChannel] = useState(null); // "tiktok" | "shopify"
+  const [saved, setSaved] = useState(() => ls.get("bliss_ambassador", null)); // { handle }
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
-
-  const NEEDS_SAMPLE_URL = "https://affiliate.tiktok.com/api/v1/oec/affiliate/seller/invitation_group/share/long_url/AIza2BnjZ9d1";
-  const TIERS = channel === "shopify" ? TIERS_SHOPIFY : TIERS_TIKTOK;
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    const clean = username.trim().replace(/^@/, "");
-    if (!clean) { setError(channel === "shopify" ? "Enter your name or handle" : "Enter your TikTok username"); return; }
+    const clean = username.trim();
+    if (!clean) { setError("Enter your name"); return; }
     try {
-      await supabase.from("ambassador_applicants").upsert(
-        { handle: clean, channel },
-        { onConflict: "handle,channel" }
-      );
-      ls.set("bliss_ambassador", { handle: clean, channel });
-      setSaved({ handle: clean, channel });
-      setMode("dashboard");
+      await supabase.from("ambassador_applicants").upsert({ handle: clean }, { onConflict: "handle" });
+      ls.set("bliss_ambassador", { handle: clean });
+      setSaved({ handle: clean });
     } catch (err) {
       console.error(err);
       setError("Something went wrong, try again");
     }
   };
 
-  if (mode === "dashboard" && saved) {
+  if (saved) {
     return (
       <AmbassadorDashboard
         handle={saved.handle}
-        channel={saved.channel}
         standalone={standalone}
-        onSwitch={() => { ls.set("bliss_ambassador", null); setSaved(null); setChannel(null); setMode("channel"); }}
+        onSwitch={() => { ls.set("bliss_ambassador", null); setSaved(null); }}
       />
     );
   }
@@ -648,62 +631,30 @@ function AmbassadorPage({ standalone }) {
           Share your link, earn cash and prizes as your referrals grow. No follower minimum, no application fee.
         </p>
 
-        {mode === "channel" && (
-          <>
-            <p style={{ fontSize: 13, color: "#999", margin: "0 0 12px", textAlign: "center" }}>Where are you promoting us?</p>
-            <button style={primaryBtn} onClick={() => { setChannel("tiktok"); setMode("choice"); }}>TikTok Shop</button>
-            <button style={{ ...primaryBtn, marginTop: 10, background: "#fff", color: ACCENT, border: `1.5px solid ${ACCENT}55` }} onClick={() => { setChannel("shopify"); setMode("form"); }}>My website / social (Shopify)</button>
-          </>
-        )}
-
-        {mode !== "channel" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-            {TIERS.map((t, i) => (
-              <div key={t.label} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.08}s` }}>
-                <div className="tierIcon" style={{ background: t.grad }}>
-                  <span className="tierIconEmoji">{t.icon}</span>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
-                  <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
-                </div>
-                <div className="tierBadge" style={{ background: t.grad }}>
-                  <span className="tierShimmer" />
-                  <span style={{ position: "relative", zIndex: 1 }}>{t.reward}</span>
-                </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+          {TIERS.map((t, i) => (
+            <div key={t.label} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.08}s` }}>
+              <div className="tierIcon" style={{ background: t.grad }}>
+                <span className="tierIconEmoji">{t.icon}</span>
               </div>
-            ))}
-          </div>
-        )}
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
+                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
+              </div>
+              <div className="tierBadge" style={{ background: t.grad }}>
+                <span className="tierShimmer" />
+                <span style={{ position: "relative", zIndex: 1 }}>{t.reward}</span>
+              </div>
+            </div>
+          ))}
+        </div>
 
-        {mode === "choice" && (
-          <>
-            <p style={{ fontSize: 13, color: "#999", margin: "0 0 12px", textAlign: "center" }}>
-              Have you already been approved for a free TikTok sample?
-            </p>
-            <button style={primaryBtn} onClick={() => setMode("form")}>Yes, I have a sample approved</button>
-            <button
-              style={{ ...primaryBtn, marginTop: 10, background: "#fff", color: ACCENT, border: `1.5px solid ${ACCENT}55` }}
-              onClick={() => window.open(NEEDS_SAMPLE_URL, "_blank")}
-            >
-              I need to apply for a sample first
-            </button>
-            <button type="button" style={{ ...ghostBtn, marginTop: 4 }} onClick={() => setMode("channel")}>← back</button>
-          </>
-        )}
+        <PromoLinkBoxes />
 
-        {mode === "form" && (
-          <form onSubmit={submit}>
-            <Field
-              label={channel === "shopify" ? "Your name or handle" : "Your TikTok username"}
-              value={username}
-              onChange={setUsername}
-              placeholder={channel === "shopify" ? "e.g. Ella Smith" : "@yourusername"}
-            />
-            <button type="submit" style={primaryBtn}>Confirm & join</button>
-            <button type="button" style={{ ...ghostBtn, marginTop: 4 }} onClick={() => setMode(channel === "tiktok" ? "choice" : "channel")}>← back</button>
-          </form>
-        )}
+        <form onSubmit={submit} style={{ marginTop: 20 }}>
+          <Field label="Your name" value={username} onChange={setUsername} placeholder="e.g. Ella Smith" />
+          <button type="submit" style={primaryBtn}>Join now</button>
+        </form>
 
         {error && <p style={{ color: "#d85a30", fontSize: 13, marginTop: 8 }}>{error}</p>}
 
@@ -715,27 +666,50 @@ function AmbassadorPage({ standalone }) {
   );
 }
 
+// ── Shared promo link boxes: website + TikTok invite ──────
+function PromoLinkBoxes() {
+  const NEEDS_SAMPLE_URL = "https://affiliate.tiktok.com/api/v1/oec/affiliate/seller/invitation_group/share/long_url/AIza2BnjZ9d1";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <a href="https://blissforyou.uk" target="_blank" rel="noreferrer" className="promoLinkBox">
+        <span className="promoLinkIcon">🛍️</span>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontWeight: 600, fontSize: 14, color: DARK, margin: "0 0 2px" }}>Promote our website</p>
+          <p style={{ fontSize: 12, color: "#999", margin: 0 }}>blissforyou.uk — share this link</p>
+        </div>
+        <span className="promoLinkArrow">→</span>
+      </a>
+      <a href={NEEDS_SAMPLE_URL} target="_blank" rel="noreferrer" className="promoLinkBox">
+        <span className="promoLinkIcon">🎵</span>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontWeight: 600, fontSize: 14, color: DARK, margin: "0 0 2px" }}>Get your TikTok affiliate link</p>
+          <p style={{ fontSize: 12, color: "#999", margin: 0 }}>Join our TikTok Shop program</p>
+        </div>
+        <span className="promoLinkArrow">→</span>
+      </a>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════
 //  AMBASSADOR DASHBOARD
 // ══════════════════════════════════════════════════════════
-function AmbassadorDashboard({ handle, channel, standalone, onSwitch }) {
+function AmbassadorDashboard({ handle, standalone, onSwitch }) {
   const navigate = useNavigate();
   const [row, setRow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshState, setRefreshState] = useState("idle"); // idle | sending | sent
 
-  const TIERS = channel === "shopify" ? TIERS_SHOPIFY : TIERS_TIKTOK;
-
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from("ambassador_applicants").select("*").eq("handle", handle).eq("channel", channel).maybeSingle();
+      const { data } = await supabase.from("ambassador_applicants").select("*").eq("handle", handle).maybeSingle();
       setRow(data);
     } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [handle, channel]);
+  useEffect(() => { load(); }, [handle]);
 
   const requestRefresh = async () => {
     if (refreshState !== "idle") return;
@@ -744,7 +718,7 @@ function AmbassadorDashboard({ handle, channel, standalone, onSwitch }) {
       await supabase.from("ambassador_applicants").update({
         refresh_requested: true,
         refresh_requested_at: new Date().toISOString(),
-      }).eq("handle", handle).eq("channel", channel);
+      }).eq("handle", handle);
       setRefreshState("sent");
       setTimeout(() => setRefreshState("idle"), 20000);
     } catch (e) {
@@ -770,10 +744,7 @@ function AmbassadorDashboard({ handle, channel, standalone, onSwitch }) {
           <button onClick={() => navigate(-1)} style={{ background: "#f5f0f0", border: "none", borderRadius: 99, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
         )}
         <div>
-          <p style={{ color: "#999", margin: 0, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-            bliss for you
-            <span className={`channelTag channelTag--${channel}`}>{channel === "shopify" ? "Shopify" : "TikTok"}</span>
-          </p>
+          <p style={{ color: "#999", margin: 0, fontSize: 13 }}>bliss for you</p>
           <h1 style={{ ...serif, fontSize: 24, color: DARK, margin: 0 }}>{handle}</h1>
         </div>
       </div>
@@ -806,6 +777,11 @@ function AmbassadorDashboard({ handle, channel, standalone, onSwitch }) {
               {refreshState === "sending" && "Sending request…"}
               {refreshState === "sent" && "Request sent ✓"}
             </button>
+          </div>
+
+          <div style={{ margin: "14px 0" }} className="fadeUp">
+            <p style={{ ...cardLabel, marginBottom: 10 }}>Promote us</p>
+            <PromoLinkBoxes />
           </div>
 
           <div className="dashTiers fadeUp">
@@ -889,9 +865,11 @@ function AdminPanel() {
   const save = async (row) => {
     const raw = edits[row.id];
     const newCount = raw !== undefined ? parseInt(raw, 10) : row.sales_count;
+    const newChannel = edits[`${row.id}_channel`] !== undefined ? edits[`${row.id}_channel`] : (row.channel || "tiktok");
     try {
       await supabase.from("ambassador_applicants").update({
         sales_count: isNaN(newCount) ? row.sales_count : newCount,
+        channel: newChannel,
         refresh_requested: false,
       }).eq("id", row.id);
       load();
@@ -955,7 +933,9 @@ function AdminPanel() {
               <div>
                 <p style={{ fontWeight: 700, color: DARK, margin: "0 0 4px", fontSize: 15 }}>{r.handle}</p>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <span className={`channelTag channelTag--${r.channel}`}>{r.channel === "shopify" ? "Shopify" : "TikTok"}</span>
+                  <span className={`channelTag channelTag--${r.channel || "tiktok"}`}>
+                    {(r.channel || "tiktok") === "shopify" ? "Shopify" : "TikTok"}
+                  </span>
                   <span style={{ color: "#bbb", fontSize: 11 }}>Joined {new Date(r.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
@@ -963,7 +943,7 @@ function AdminPanel() {
                 <span className="adminPulseBadge">Refresh requested</span>
               )}
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <input
                 type="number"
                 defaultValue={r.sales_count}
@@ -971,6 +951,15 @@ function AdminPanel() {
                 className="adminInput"
               />
               <span style={{ color: "#999", fontSize: 13 }}>sales</span>
+              <select
+                defaultValue={r.channel || "tiktok"}
+                onChange={(e) => setEdits((prev) => ({ ...prev, [`${r.id}_channel`]: e.target.value }))}
+                className="adminInput"
+                style={{ width: "auto" }}
+              >
+                <option value="tiktok">TikTok</option>
+                <option value="shopify">Shopify</option>
+              </select>
               <button style={{ ...primaryBtn, width: "auto", padding: "10px 18px", marginLeft: "auto" }} onClick={() => save(r)}>Save</button>
             </div>
           </div>
@@ -981,6 +970,38 @@ function AdminPanel() {
 }
 
 const ambassadorCss = `
+  .promoLinkBox {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    border: 1px solid ${ACCENT}33;
+    border-radius: 18px;
+    padding: 14px 16px;
+    text-decoration: none;
+    transition: box-shadow .2s, transform .2s;
+  }
+  .promoLinkBox:hover {
+    box-shadow: 0 6px 20px rgba(0,0,0,.08);
+    transform: translateY(-1px);
+  }
+  .promoLinkIcon {
+    font-size: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #fdf2f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .promoLinkArrow {
+    color: ${ACCENT};
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
   .channelTag {
     font-size: 10px;
     font-weight: 700;
