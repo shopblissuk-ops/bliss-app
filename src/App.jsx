@@ -577,25 +577,27 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
 // ══════════════════════════════════════════════════════════
 function AmbassadorPage({ standalone }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [mode, setMode] = useState("choice"); // choice | form | submitted
+  const [username, setUsername] = useState("");
   const [error, setError] = useState("");
 
+  const NEEDS_SAMPLE_URL = "https://affiliate.tiktok.com/api/v1/oec/affiliate/seller/invitation_group/share/long_url/AIza2BnjZ9d1";
+
   const TIERS = [
-    { sales: "10 sales", label: "first milestone", reward: "£25 bonus" },
-    { sales: "100 sales", label: "rising star", reward: "£350 bonus" },
-    { sales: "200 sales", label: "top performer", reward: "new laptop" },
-    { sales: "1,000 sales", label: "elite ambassador", reward: "iPhone + £1,500" },
-    { sales: "10,000 sales", label: "legendary", reward: "a car" },
+    { sales: "10 sales", label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
+    { sales: "100 sales", label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
+    { sales: "200 sales", label: "top performer", reward: "New Laptop", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
+    { sales: "1,000 sales", label: "elite ambassador", reward: "iPhone + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
   ];
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!email || !email.includes("@")) { setError("Enter a valid email address"); return; }
+    const clean = username.trim().replace(/^@/, "");
+    if (!clean) { setError("Enter your TikTok username"); return; }
     try {
-      await supabase.from("ambassador_applicants").insert({ email });
-      setSubmitted(true);
+      await supabase.from("ambassador_applicants").insert({ tiktok_username: clean });
+      setMode("submitted");
     } catch (err) {
       console.error(err);
       setError("Something went wrong, try again");
@@ -605,6 +607,7 @@ function AmbassadorPage({ standalone }) {
   return (
     <Shell>
       <style>{globalCss}</style>
+      <style>{ambassadorCss}</style>
       <div style={{ padding: "24px 4px 8px", display: "flex", alignItems: "center", gap: 12 }}>
         {!standalone && (
           <button onClick={() => navigate(-1)} style={{ background: "#f5f0f0", border: "none", borderRadius: 99, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
@@ -616,42 +619,121 @@ function AmbassadorPage({ standalone }) {
       </div>
 
       <div style={card}>
-        <p style={{ color: "#888", fontSize: 14, margin: "0 0 20px", lineHeight: 1.6 }}>
+        <p style={{ color: "#888", fontSize: 14, margin: "0 0 22px", lineHeight: 1.6 }}>
           Share your link, earn cash and prizes as your referrals grow. No follower minimum, no application fee.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "#f0e8e7", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
           {TIERS.map((t, i) => (
-            <div key={t.sales} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px 18px", background: "#fff" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 99, background: "#fdf2f0", color: ACCENT, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</div>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.sales}</p>
-                  <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
-                </div>
+            <div key={t.sales} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.08}s` }}>
+              <div className="tierIcon" style={{ background: t.grad }}>
+                <span className="tierIconEmoji">{t.icon}</span>
               </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: ACCENT, whiteSpace: "nowrap" }}>{t.reward}</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.sales}</p>
+                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
+              </div>
+              <div className="tierBadge" style={{ background: t.grad }}>
+                <span className="tierShimmer" />
+                <span style={{ position: "relative", zIndex: 1 }}>{t.reward}</span>
+              </div>
             </div>
           ))}
         </div>
 
-        {submitted ? (
-          <p style={{ color: ACCENT, fontWeight: 600, fontSize: 14 }}>You're on the list — check your inbox soon.</p>
-        ) : (
+        {mode === "choice" && (
+          <>
+            <p style={{ fontSize: 13, color: "#999", margin: "0 0 12px", textAlign: "center" }}>
+              Have you already been approved for a free TikTok sample?
+            </p>
+            <button style={primaryBtn} onClick={() => setMode("form")}>Yes, I have a sample approved</button>
+            <button
+              style={{ ...primaryBtn, marginTop: 10, background: "#fff", color: ACCENT, border: `1.5px solid ${ACCENT}55` }}
+              onClick={() => window.open(NEEDS_SAMPLE_URL, "_blank")}
+            >
+              I need to apply for a sample first
+            </button>
+          </>
+        )}
+
+        {mode === "form" && (
           <form onSubmit={submit}>
-            <Field label="Your email" value={email} onChange={setEmail} placeholder="you@email.com" type="email" />
-            <button type="submit" style={primaryBtn}>Apply now</button>
+            <Field label="Your TikTok username" value={username} onChange={setUsername} placeholder="@yourusername" />
+            <button type="submit" style={primaryBtn}>Confirm & join</button>
+            <button type="button" style={{ ...ghostBtn, marginTop: 4 }} onClick={() => setMode("choice")}>← back</button>
           </form>
         )}
+
+        {mode === "submitted" && (
+          <p style={{ color: ACCENT, fontWeight: 600, fontSize: 14, textAlign: "center" }}>
+            You're in — we'll track your sales against @{username.replace(/^@/, "")}.
+          </p>
+        )}
+
         {error && <p style={{ color: "#d85a30", fontSize: 13, marginTop: 8 }}>{error}</p>}
 
-        <p style={{ fontSize: 11, color: "#ccc", marginTop: 16, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 11, color: "#ccc", marginTop: 20, lineHeight: 1.6 }}>
           Rewards are calculated on verified, non-refunded sales made through your unique referral link only. Self-purchases and fraudulent activity void eligibility. Full terms sent on approval.
         </p>
       </div>
     </Shell>
   );
 }
+
+const ambassadorCss = `
+  .tierCard {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #fff;
+    border: 1px solid #f0e8e7;
+    border-radius: 18px;
+    padding: 12px 14px;
+    position: relative;
+  }
+  .tierIcon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,.14);
+  }
+  .tierIconEmoji {
+    font-size: 20px;
+    display: inline-block;
+    animation: iconFloat 2.6s ease-in-out infinite;
+  }
+  @keyframes iconFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+  .tierBadge {
+    position: relative;
+    overflow: hidden;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #2C2C2C;
+    white-space: nowrap;
+  }
+  .tierShimmer {
+    position: absolute;
+    top: 0; left: -60%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,.7), transparent);
+    animation: shimmerSweep 2.8s ease-in-out infinite;
+  }
+  @keyframes shimmerSweep {
+    0% { left: -60%; }
+    60% { left: 130%; }
+    100% { left: 130%; }
+  }
+`;
 
 // ══════════════════════════════════════════════════════════
 //  DOG BOOKING
