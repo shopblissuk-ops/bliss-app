@@ -30,8 +30,8 @@ const ls = {
 const TIERS = [
   { threshold: 10, label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
   { threshold: 100, label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
-  { threshold: 200, label: "top performer", reward: "New Laptop", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
-  { threshold: 1000, label: "elite ambassador", reward: "iPhone + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
+  { threshold: 200, label: "top performer", reward: "MacBook Air", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
+  { threshold: 1000, label: "elite ambassador", reward: "iPhone 17 + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
 ];
 
 // ══════════════════════════════════════════════════════════
