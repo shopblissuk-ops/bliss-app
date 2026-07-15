@@ -35,7 +35,8 @@ export default function App() {
   if (!installed) return <InstallGate onDone={() => { ls.set("bliss_installed", true); setInstalled(true); }} />;
   if (!user) return <Signup onDone={(u) => { ls.set("bliss_user", u); setUser(u); }} />;
   if (page === "dog") return <DogBooking onBack={() => setPage("home")} />;
-  return <Home user={user} setUser={setUser} onDog={() => setPage("dog")} />;
+  if (page === "rewards") return <AmbassadorPage onBack={() => setPage("home")} />;
+  return <Home user={user} setUser={setUser} onDog={() => setPage("dog")} onRewards={() => setPage("rewards")} />;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -118,7 +119,7 @@ function Signup({ onDone }) {
 // ══════════════════════════════════════════════════════════
 //  HOME — single scroll page
 // ══════════════════════════════════════════════════════════
-function Home({ user, setUser, onDog }) {
+function Home({ user, setUser, onDog, onRewards }) {
   const [streak, setStreak] = useState(user.day_streak || 0);
   const [last, setLast] = useState(user.last_checkin);
 
@@ -210,6 +211,9 @@ function Home({ user, setUser, onDog }) {
 
       {/* SHOP */}
       <ShopCard />
+
+      {/* AMBASSADOR PROGRAM */}
+      <AmbassadorCard onOpen={onRewards} />
 
       {streak >= 27 && (
         <div style={{ ...card, background: "#fff4f2", borderColor: ACCENT }}>
@@ -517,6 +521,19 @@ function ShopCard() {
   );
 }
 
+// ── AMBASSADOR TEASER CARD (on Home) ──────────────────────
+function AmbassadorCard({ onOpen }) {
+  return (
+    <div style={card} className="fadeUp">
+      <p style={cardLabel}>Become an ambassador</p>
+      <p style={{ color: "#888", fontSize: 14, margin: "8px 0 14px", lineHeight: 1.5 }}>
+        Share your link, earn cash and prizes as your referrals grow.
+      </p>
+      <button style={primaryBtn} onClick={onOpen}>See rewards</button>
+    </div>
+  );
+}
+
 // ── DOT ROW ───────────────────────────────────────────────
 function DotRow({ streak }) {
   return (
@@ -536,6 +553,84 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
       <input type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)}
         style={{ width: "100%", border: "1px solid #e7dcdb", borderRadius: 12, padding: 14, fontSize: 16, fontFamily: "inherit", boxSizing: "border-box" }} />
     </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+//  AMBASSADOR / REWARDS PAGE
+// ══════════════════════════════════════════════════════════
+function AmbassadorPage({ onBack }) {
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+
+  const TIERS = [
+    { sales: "10 sales", label: "first milestone", reward: "£25 bonus" },
+    { sales: "100 sales", label: "rising star", reward: "£350 bonus" },
+    { sales: "200 sales", label: "top performer", reward: "new laptop" },
+    { sales: "1,000 sales", label: "elite ambassador", reward: "iPhone + £1,500" },
+    { sales: "10,000 sales", label: "legendary", reward: "a car" },
+  ];
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!email || !email.includes("@")) { setError("Enter a valid email address"); return; }
+    try {
+      await supabase.from("ambassador_applicants").insert({ email });
+      setSubmitted(true);
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong, try again");
+    }
+  };
+
+  return (
+    <Shell>
+      <style>{globalCss}</style>
+      <div style={{ padding: "24px 4px 8px", display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={onBack} style={{ background: "#f5f0f0", border: "none", borderRadius: 99, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+        <div>
+          <p style={{ color: "#999", margin: 0, fontSize: 13 }}>bliss for you</p>
+          <h1 style={{ ...serif, fontSize: 24, color: DARK, margin: 0 }}>become an ambassador</h1>
+        </div>
+      </div>
+
+      <div style={card}>
+        <p style={{ color: "#888", fontSize: 14, margin: "0 0 20px", lineHeight: 1.6 }}>
+          Share your link, earn cash and prizes as your referrals grow. No follower minimum, no application fee.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "#f0e8e7", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+          {TIERS.map((t, i) => (
+            <div key={t.sales} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px 18px", background: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 99, background: "#fdf2f0", color: ACCENT, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</div>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.sales}</p>
+                  <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
+                </div>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: ACCENT, whiteSpace: "nowrap" }}>{t.reward}</div>
+            </div>
+          ))}
+        </div>
+
+        {submitted ? (
+          <p style={{ color: ACCENT, fontWeight: 600, fontSize: 14 }}>You're on the list — check your inbox soon.</p>
+        ) : (
+          <form onSubmit={submit}>
+            <Field label="Your email" value={email} onChange={setEmail} placeholder="you@email.com" type="email" />
+            <button type="submit" style={primaryBtn}>Apply now</button>
+          </form>
+        )}
+        {error && <p style={{ color: "#d85a30", fontSize: 13, marginTop: 8 }}>{error}</p>}
+
+        <p style={{ fontSize: 11, color: "#ccc", marginTop: 16, lineHeight: 1.6 }}>
+          Rewards are calculated on verified, non-refunded sales made through your unique referral link only. Self-purchases and fraudulent activity void eligibility. Full terms sent on approval.
+        </p>
+      </div>
+    </Shell>
   );
 }
 
