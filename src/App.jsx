@@ -27,7 +27,14 @@ const ls = {
 };
 
 // ── Ambassador reward tiers (shared by rewards page + dashboard) ──
-const TIERS = [
+const TIERS_SHOPIFY = [
+  { threshold: 10, label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
+  { threshold: 100, label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
+  { threshold: 200, label: "top performer", reward: "MacBook Air", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
+  { threshold: 1000, label: "elite ambassador", reward: "iPhone 17 + £1,500", icon: "📱", grad: "linear-gradient(135deg, #e3c6ff, #8ec8ff)" },
+];
+
+const TIERS_TIKTOK = [
   { threshold: 15, label: "first milestone", reward: "£25 Bonus", icon: "💰", grad: "linear-gradient(135deg, #f3d9b1, #d9a86c)" },
   { threshold: 150, label: "rising star", reward: "£350 Bonus", icon: "💸", grad: "linear-gradient(135deg, #dbe4ec, #aebccb)" },
   { threshold: 300, label: "top performer", reward: "MacBook Air", icon: "💻", grad: "linear-gradient(135deg, #ffe9a8, #f0b93f)" },
@@ -627,27 +634,14 @@ function AmbassadorPage({ standalone }) {
       </div>
 
       <div style={card}>
-        <p style={{ color: "#888", fontSize: 14, margin: "0 0 22px", lineHeight: 1.6 }}>
+        <p style={{ color: "#888", fontSize: 14, margin: "0 0 18px", lineHeight: 1.6 }}>
           Share your link, earn cash and prizes as your referrals grow. No follower minimum, no application fee.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-          {TIERS.map((t, i) => (
-            <div key={t.label} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.08}s` }}>
-              <div className="tierIcon" style={{ background: t.grad }}>
-                <span className="tierIconEmoji">{t.icon}</span>
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
-                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
-              </div>
-              <div className="tierBadge" style={{ background: t.grad }}>
-                <span className="tierShimmer" />
-                <span style={{ position: "relative", zIndex: 1 }}>{t.reward}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ChannelExplainer />
+
+        <TierGroup title="Shopify rewards" subtitle="Sales via blissforyou.uk" tiers={TIERS_SHOPIFY} />
+        <TierGroup title="TikTok rewards" subtitle="Sales via your TikTok Shop link" tiers={TIERS_TIKTOK} />
 
         <PromoLinkBoxes />
 
@@ -663,6 +657,48 @@ function AmbassadorPage({ standalone }) {
         </p>
       </div>
     </Shell>
+  );
+}
+
+// ── Explains how sales are split between channels ─────────
+function ChannelExplainer() {
+  return (
+    <div className="explainerBox">
+      <p style={{ fontSize: 13, fontWeight: 600, color: DARK, margin: "0 0 6px" }}>How your sales are counted</p>
+      <p style={{ fontSize: 12, color: "#888", margin: "0 0 4px", lineHeight: 1.5 }}>
+        <b>Shopify:</b> counts when someone buys through your website link (blissforyou.uk).
+      </p>
+      <p style={{ fontSize: 12, color: "#888", margin: 0, lineHeight: 1.5 }}>
+        <b>TikTok:</b> counts when someone buys through your TikTok Shop affiliate link.
+      </p>
+    </div>
+  );
+}
+
+// ── Reusable tier ladder display (used on join screen) ─────
+function TierGroup({ title, subtitle, tiers }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <p style={{ fontSize: 13, fontWeight: 700, color: DARK, margin: "0 0 2px" }}>{title}</p>
+      <p style={{ fontSize: 11, color: "#aaa", margin: "0 0 10px" }}>{subtitle}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {tiers.map((t, i) => (
+          <div key={t.label} className="tierCard fadeUp" style={{ animationDelay: `${i * 0.06}s` }}>
+            <div className="tierIcon" style={{ background: t.grad }}>
+              <span className="tierIconEmoji">{t.icon}</span>
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
+              <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
+            </div>
+            <div className="tierBadge" style={{ background: t.grad }}>
+              <span className="tierShimmer" />
+              <span style={{ position: "relative", zIndex: 1 }}>{t.reward}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -698,7 +734,6 @@ function AmbassadorDashboard({ handle, standalone, onSwitch }) {
   const navigate = useNavigate();
   const [row, setRow] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [refreshState, setRefreshState] = useState("idle"); // idle | sending | sent
 
   const load = async () => {
     setLoading(true);
@@ -710,30 +745,6 @@ function AmbassadorDashboard({ handle, standalone, onSwitch }) {
   };
 
   useEffect(() => { load(); }, [handle]);
-
-  const requestRefresh = async () => {
-    if (refreshState !== "idle") return;
-    setRefreshState("sending");
-    try {
-      await supabase.from("ambassador_applicants").update({
-        refresh_requested: true,
-        refresh_requested_at: new Date().toISOString(),
-      }).eq("handle", handle);
-      setRefreshState("sent");
-      setTimeout(() => setRefreshState("idle"), 20000);
-    } catch (e) {
-      console.error(e);
-      setRefreshState("idle");
-    }
-  };
-
-  const sales = row?.sales_count ?? 0;
-  const currentTierIndex = TIERS.reduce((acc, t, i) => (sales >= t.threshold ? i : acc), -1);
-  const nextTier = TIERS[currentTierIndex + 1];
-  const prevThreshold = currentTierIndex >= 0 ? TIERS[currentTierIndex].threshold : 0;
-  const progressPct = nextTier
-    ? Math.min(100, Math.round(((sales - prevThreshold) / (nextTier.threshold - prevThreshold)) * 100))
-    : 100;
 
   return (
     <Shell>
@@ -753,58 +764,28 @@ function AmbassadorDashboard({ handle, standalone, onSwitch }) {
         <div style={card}><p style={{ color: "#aaa", fontSize: 13 }}>Loading your dashboard…</p></div>
       ) : (
         <>
-          <div className="dashHero fadeUp">
-            <p style={cardLabel}>Your verified sales</p>
-            <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
-              <span className="dashSalesNum">{sales}</span>
-            </div>
-            {nextTier ? (
-              <>
-                <div className="progressTrack">
-                  <div className="progressFill" style={{ width: `${progressPct}%` }}>
-                    <span className="progressShimmer" />
-                  </div>
-                </div>
-                <p style={{ color: "#999", fontSize: 12, textAlign: "center", margin: "8px 0 0" }}>
-                  {nextTier.threshold - sales > 0 ? `${nextTier.threshold - sales} sales to ${nextTier.reward}` : "Almost there!"}
-                </p>
-              </>
-            ) : (
-              <p style={{ color: ACCENT, fontSize: 13, textAlign: "center", fontWeight: 600 }}>You've unlocked every tier 🎉</p>
-            )}
-            <button className="refreshBtn" onClick={requestRefresh} disabled={refreshState !== "idle"}>
-              {refreshState === "idle" && "↻ Refresh my stats"}
-              {refreshState === "sending" && "Sending request…"}
-              {refreshState === "sent" && "Request sent ✓"}
-            </button>
-          </div>
+          <ChannelExplainer />
 
           <div style={{ margin: "14px 0" }} className="fadeUp">
             <p style={{ ...cardLabel, marginBottom: 10 }}>Promote us</p>
             <PromoLinkBoxes />
           </div>
 
-          <div className="dashTiers fadeUp">
-            <p style={cardLabel}>Reward tiers</p>
-            {TIERS.map((t, i) => {
-              const state = sales >= t.threshold ? "unlocked" : (i === currentTierIndex + 1 ? "current" : "locked");
-              return (
-                <div key={t.label} className={`tierRow tierRow--${state}`}>
-                  <div className="tierIcon" style={{ background: state === "locked" ? "#eee" : t.grad }}>
-                    <span className={state === "locked" ? "" : "tierIconEmoji"}>{state === "unlocked" ? "✓" : t.icon}</span>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: state === "locked" ? "#bbb" : DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
-                    <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
-                  </div>
-                  <div className="tierBadge" style={{ background: state === "locked" ? "#f2f2f2" : t.grad }}>
-                    {state !== "locked" && <span className="tierShimmer" />}
-                    <span style={{ position: "relative", zIndex: 1, color: state === "locked" ? "#bbb" : "#2C2C2C" }}>{t.reward}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <ChannelProgress
+            title="Shopify progress"
+            sales={row?.shopify_sales ?? 0}
+            tiers={TIERS_SHOPIFY}
+            handle={handle}
+            field="shopify"
+          />
+
+          <ChannelProgress
+            title="TikTok progress"
+            sales={row?.tiktok_sales ?? 0}
+            tiers={TIERS_TIKTOK}
+            handle={handle}
+            field="tiktok"
+          />
 
           <div style={card} className="fadeUp">
             <p style={cardLabel}>How to sell more</p>
@@ -827,6 +808,87 @@ function AmbassadorDashboard({ handle, standalone, onSwitch }) {
   );
 }
 
+// ── One channel's progress block: refresh button, sales, progress bar, tier ladder ──
+function ChannelProgress({ title, sales, tiers, handle, field }) {
+  const [refreshState, setRefreshState] = useState("idle"); // idle | sending | sent
+
+  const currentTierIndex = tiers.reduce((acc, t, i) => (sales >= t.threshold ? i : acc), -1);
+  const nextTier = tiers[currentTierIndex + 1];
+  const prevThreshold = currentTierIndex >= 0 ? tiers[currentTierIndex].threshold : 0;
+  const progressPct = nextTier
+    ? Math.min(100, Math.round(((sales - prevThreshold) / (nextTier.threshold - prevThreshold)) * 100))
+    : 100;
+
+  const requestRefresh = async () => {
+    if (refreshState !== "idle") return;
+    setRefreshState("sending");
+    try {
+      await supabase.from("ambassador_applicants").update({
+        [`${field}_refresh_requested`]: true,
+        [`${field}_refresh_requested_at`]: new Date().toISOString(),
+      }).eq("handle", handle);
+      setRefreshState("sent");
+      setTimeout(() => setRefreshState("idle"), 20000);
+    } catch (e) {
+      console.error(e);
+      setRefreshState("idle");
+    }
+  };
+
+  return (
+    <>
+      <div className="dashHero fadeUp">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <p style={cardLabel}>{title}</p>
+          <button className="refreshBtnSmall" onClick={requestRefresh} disabled={refreshState !== "idle"}>
+            {refreshState === "idle" && "↻ Refresh"}
+            {refreshState === "sending" && "Sending…"}
+            {refreshState === "sent" && "Sent ✓"}
+          </button>
+        </div>
+        <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
+          <span className="dashSalesNum">{sales}</span>
+        </div>
+        {nextTier ? (
+          <>
+            <div className="progressTrack">
+              <div className="progressFill" style={{ width: `${progressPct}%` }}>
+                <span className="progressShimmer" />
+              </div>
+            </div>
+            <p style={{ color: "#999", fontSize: 12, textAlign: "center", margin: "8px 0 0" }}>
+              {nextTier.threshold - sales > 0 ? `${nextTier.threshold - sales} sales to ${nextTier.reward}` : "Almost there!"}
+            </p>
+          </>
+        ) : (
+          <p style={{ color: ACCENT, fontSize: 13, textAlign: "center", fontWeight: 600 }}>You've unlocked every tier 🎉</p>
+        )}
+      </div>
+
+      <div className="dashTiers fadeUp">
+        {tiers.map((t, i) => {
+          const state = sales >= t.threshold ? "unlocked" : (i === currentTierIndex + 1 ? "current" : "locked");
+          return (
+            <div key={t.label} className={`tierRow tierRow--${state}`}>
+              <div className="tierIcon" style={{ background: state === "locked" ? "#eee" : t.grad }}>
+                <span className={state === "locked" ? "" : "tierIconEmoji"}>{state === "unlocked" ? "✓" : t.icon}</span>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: state === "locked" ? "#bbb" : DARK, margin: "0 0 2px" }}>{t.threshold.toLocaleString()} sales</p>
+                <p style={{ fontSize: 12, color: "#999", margin: 0 }}>{t.label}</p>
+              </div>
+              <div className="tierBadge" style={{ background: state === "locked" ? "#f2f2f2" : t.grad }}>
+                {state !== "locked" && <span className="tierShimmer" />}
+                <span style={{ position: "relative", zIndex: 1, color: state === "locked" ? "#bbb" : "#2C2C2C" }}>{t.reward}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 const CONTENT_TIPS = [
   { title: "Hook in the first 2 seconds", desc: "Open with the result or a bold claim — don't start with 'hey guys'." },
   { title: "Show the product in use", desc: "Hold the bottle, show the routine — viewers convert better when they see it in hand." },
@@ -843,7 +905,6 @@ function AdminPanel() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [edits, setEdits] = useState({});
-  const [filter, setFilter] = useState("all"); // all | tiktok | shopify
 
   const ADMIN_PIN = "bliss2026"; // change this to your own PIN
 
@@ -853,7 +914,6 @@ function AdminPanel() {
       const { data } = await supabase
         .from("ambassador_applicants")
         .select("*")
-        .order("refresh_requested", { ascending: false })
         .order("created_at", { ascending: false });
       setRows(data || []);
     } catch (e) { console.error(e); }
@@ -863,14 +923,16 @@ function AdminPanel() {
   useEffect(() => { if (authed) load(); }, [authed]);
 
   const save = async (row) => {
-    const raw = edits[row.id];
-    const newCount = raw !== undefined ? parseInt(raw, 10) : row.sales_count;
-    const newChannel = edits[`${row.id}_channel`] !== undefined ? edits[`${row.id}_channel`] : (row.channel || "tiktok");
+    const shopifyRaw = edits[`${row.id}_shopify`];
+    const tiktokRaw = edits[`${row.id}_tiktok`];
+    const shopifySales = shopifyRaw !== undefined ? parseInt(shopifyRaw, 10) : row.shopify_sales;
+    const tiktokSales = tiktokRaw !== undefined ? parseInt(tiktokRaw, 10) : row.tiktok_sales;
     try {
       await supabase.from("ambassador_applicants").update({
-        sales_count: isNaN(newCount) ? row.sales_count : newCount,
-        channel: newChannel,
-        refresh_requested: false,
+        shopify_sales: isNaN(shopifySales) ? row.shopify_sales : shopifySales,
+        tiktok_sales: isNaN(tiktokSales) ? row.tiktok_sales : tiktokSales,
+        shopify_refresh_requested: false,
+        tiktok_refresh_requested: false,
       }).eq("id", row.id);
       load();
     } catch (e) { console.error(e); }
@@ -894,74 +956,57 @@ function AdminPanel() {
     );
   }
 
-  const filtered = filter === "all" ? rows : rows.filter((r) => r.channel === filter);
-  const counts = {
-    all: rows.length,
-    tiktok: rows.filter((r) => r.channel === "tiktok").length,
-    shopify: rows.filter((r) => r.channel === "shopify").length,
-  };
-
   return (
     <Shell>
       <style>{globalCss}</style>
       <style>{ambassadorCss}</style>
       <div className="adminHeader fadeUp">
         <h1 style={{ ...serif, fontSize: 28, color: DARK, margin: 0 }}>ambassador admin</h1>
-        <p style={{ color: "#999", fontSize: 13, margin: "4px 0 0" }}>{rows.length} total applicants</p>
-      </div>
-
-      <div className="adminTabs fadeUp">
-        {[
-          { key: "all", label: "All" },
-          { key: "tiktok", label: "TikTok" },
-          { key: "shopify", label: "Shopify" },
-        ].map((t) => (
-          <button key={t.key} className={`adminTab ${filter === t.key ? "adminTab--active" : ""}`} onClick={() => setFilter(t.key)}>
-            {t.label} <span className="adminTabCount">{counts[t.key]}</span>
-          </button>
-        ))}
+        <p style={{ color: "#999", fontSize: 13, margin: "4px 0 0" }}>{rows.length} applicants</p>
       </div>
 
       {loading ? (
         <p style={{ color: "#aaa", fontSize: 13 }}>Loading…</p>
-      ) : filtered.length === 0 ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>No applicants in this view yet.</p>
+      ) : rows.length === 0 ? (
+        <p style={{ color: "#aaa", fontSize: 13 }}>No applicants yet.</p>
       ) : (
-        filtered.map((r, i) => (
+        rows.map((r, i) => (
           <div key={r.id} className="adminCard fadeUp" style={{ animationDelay: `${i * 0.05}s` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
               <div>
                 <p style={{ fontWeight: 700, color: DARK, margin: "0 0 4px", fontSize: 15 }}>{r.handle}</p>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <span className={`channelTag channelTag--${r.channel || "tiktok"}`}>
-                    {(r.channel || "tiktok") === "shopify" ? "Shopify" : "TikTok"}
-                  </span>
-                  <span style={{ color: "#bbb", fontSize: 11 }}>Joined {new Date(r.created_at).toLocaleDateString()}</span>
-                </div>
+                <span style={{ color: "#bbb", fontSize: 11 }}>Joined {new Date(r.created_at).toLocaleDateString()}</span>
               </div>
-              {r.refresh_requested && (
-                <span className="adminPulseBadge">Refresh requested</span>
-              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                {r.shopify_refresh_requested && <span className="adminPulseBadge">Shopify refresh</span>}
+                {r.tiktok_refresh_requested && <span className="adminPulseBadge">TikTok refresh</span>}
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+
+            <div className="adminChannelRow">
+              <span className="channelTag channelTag--shopify">Shopify</span>
               <input
                 type="number"
-                defaultValue={r.sales_count}
-                onChange={(e) => setEdits((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                defaultValue={r.shopify_sales}
+                onChange={(e) => setEdits((prev) => ({ ...prev, [`${r.id}_shopify`]: e.target.value }))}
                 className="adminInput"
               />
-              <span style={{ color: "#999", fontSize: 13 }}>sales</span>
-              <select
-                defaultValue={r.channel || "tiktok"}
-                onChange={(e) => setEdits((prev) => ({ ...prev, [`${r.id}_channel`]: e.target.value }))}
-                className="adminInput"
-                style={{ width: "auto" }}
-              >
-                <option value="tiktok">TikTok</option>
-                <option value="shopify">Shopify</option>
-              </select>
-              <button style={{ ...primaryBtn, width: "auto", padding: "10px 18px", marginLeft: "auto" }} onClick={() => save(r)}>Save</button>
+              <span style={{ color: "#999", fontSize: 12 }}>sales</span>
             </div>
+
+            <div className="adminChannelRow">
+              <span className="channelTag channelTag--tiktok">TikTok</span>
+              <input
+                type="number"
+                defaultValue={r.tiktok_sales}
+                onChange={(e) => setEdits((prev) => ({ ...prev, [`${r.id}_tiktok`]: e.target.value }))}
+                className="adminInput"
+              />
+              <span style={{ color: "#999", fontSize: 12 }}>sales</span>
+            </div>
+
+            <button style={{ ...primaryBtn, width: "auto", padding: "10px 18px", marginTop: 10, float: "right" }} onClick={() => save(r)}>Save</button>
+            <div style={{ clear: "both" }} />
           </div>
         ))
       )}
@@ -970,6 +1015,35 @@ function AdminPanel() {
 }
 
 const ambassadorCss = `
+  .explainerBox {
+    background: #faf7f6;
+    border: 1px solid #f0e8e7;
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+  }
+
+  .refreshBtnSmall {
+    background: #fff;
+    border: 1.5px solid ${ACCENT}55;
+    color: ${ACCENT};
+    font-weight: 600;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 99px;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .refreshBtnSmall:disabled { opacity: .6; cursor: default; }
+
+  .adminChannelRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
   .promoLinkBox {
     display: flex;
     align-items: center;
