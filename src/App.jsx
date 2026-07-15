@@ -245,7 +245,7 @@ function Home({ user, setUser }) {
         </div>
       )}
 
-      <p style={{ textAlign: "center", color: "#bbb", fontSize: 12, margin: "30px 0" }}>bliss for you</p>
+      <Link to="/admin" style={{ textAlign: "center", color: "#bbb", fontSize: 12, margin: "30px 0", display: "block", textDecoration: "none" }}>bliss for you</Link>
     </Shell>
   );
 }
