@@ -965,6 +965,27 @@ function AdminPanel() {
         <p style={{ color: "#999", fontSize: 13, margin: "4px 0 0" }}>{rows.length} applicants</p>
       </div>
 
+      {!loading && rows.length > 0 && (
+        <div className="adminStatsGrid fadeUp">
+          <div className="adminStatBox">
+            <p className="adminStatNum">{rows.length}</p>
+            <p className="adminStatLabel">Total creators</p>
+          </div>
+          <div className="adminStatBox">
+            <p className="adminStatNum">{rows.reduce((sum, r) => sum + (r.shopify_sales || 0), 0)}</p>
+            <p className="adminStatLabel">Shopify sales</p>
+          </div>
+          <div className="adminStatBox">
+            <p className="adminStatNum">{rows.reduce((sum, r) => sum + (r.tiktok_sales || 0), 0)}</p>
+            <p className="adminStatLabel">TikTok sales</p>
+          </div>
+          <div className="adminStatBox">
+            <p className="adminStatNum">{rows.filter((r) => r.shopify_refresh_requested || r.tiktok_refresh_requested).length}</p>
+            <p className="adminStatLabel">Pending refresh</p>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p style={{ color: "#aaa", fontSize: 13 }}>Loading…</p>
       ) : rows.length === 0 ? (
@@ -1015,6 +1036,33 @@ function AdminPanel() {
 }
 
 const ambassadorCss = `
+  .adminStatsGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 14px 0 20px;
+  }
+  .adminStatBox {
+    background: #fff;
+    border: 1px solid ${ACCENT}22;
+    border-radius: 18px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,.04);
+  }
+  .adminStatNum {
+    font-family: 'Cormorant', Georgia, serif;
+    font-weight: 700;
+    font-size: 32px;
+    color: ${DARK};
+    margin: 0 0 2px;
+  }
+  .adminStatLabel {
+    font-size: 11px;
+    color: #999;
+    margin: 0;
+  }
+
   .explainerBox {
     background: #faf7f6;
     border: 1px solid #f0e8e7;
